@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>区块链电子投票系统</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>区块链电子投票系统</h1>
+        <p style="color:white;text-align:center;margin-bottom:20px;">
+            安全、透明、可验证的投票平台
+        </p>
+
+        <!-- 登录卡片 -->
+        <div class="card">
+            <h2>用户登录</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">登录</button>
+            </form>
+            <p style="margin-top:15px;">
+                没有账号？<a href="register.html">立即注册</a>
+            </p>
+            <div id="status"></div>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+</body>
+</html>

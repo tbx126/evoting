@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投票 - 区块链电子投票系统</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>区块链电子投票系统</h1>
+
+        <!-- 钱包连接状态 -->
+        <div class="card">
+            <h2>钱包状态</h2>
+            <p id="walletStatus">未连接</p>
+            <button id="connectBtn" class="btn btn-primary">
+                连接 MetaMask
+            </button>
+        </div>
+
+        <!-- 候选人列表 -->
+        <div class="card">
+            <h2>选择候选人</h2>
+            <div id="candidates"></div>
+            <button id="voteBtn" class="btn btn-primary" disabled>
+                提交投票
+            </button>
+            <div id="status"></div>
+        </div>
+    </div>
+
+    <script src="js/web3-utils.js"></script>
+    <script src="js/voting.js"></script>
+</body>
+</html>
