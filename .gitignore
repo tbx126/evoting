@@ -1,0 +1,94 @@
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# ============ Node.js ============
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# ============ Hardhat ============
+artifacts/
+cache/
+typechain/
+typechain-types/
+
+# ============ Environment & Secrets ============
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.secret
+secrets.json
+
+# Private keys (CRITICAL)
+*private*key*
+*PRIVATE*KEY*
+wallet.json
+
+# ============ Database ============
+*.db
+*.sqlite
+*.sqlite3
+
+# ============ IDE & Editors ============
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ============ Logs ============
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============ Testing ============
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# ============ Blockchain Specific ============
+# Deployment addresses (if sensitive)
+deployments/localhost/
+.openzeppelin/
+
+# Gas reports
+gas-report.txt
+
+# Coverage reports
+coverage/
+coverage.json
