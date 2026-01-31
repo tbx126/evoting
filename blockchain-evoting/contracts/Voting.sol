@@ -2,6 +2,15 @@
 pragma solidity ^0.8.20;
 
 /**
+ * @title IVoterRegistry - 选民注册合约接口
+ */
+interface IVoterRegistry {
+    function isRegistered(address _voter) external view returns (bool);
+    function hasVoted(address _voter) external view returns (bool);
+    function markAsVoted(address _voter) external;
+}
+
+/**
  * @title Voting - 主投票合约
  * @notice 管理选举创建、投票提交和结果统计
  * @dev 支持加密投票承诺，与 VoterRegistry 配合使用
@@ -195,11 +204,19 @@ contract Voting {
         uint256 _electionId,
         bytes32 _commitment
     ) external electionExists(_electionId) electionActive(_electionId) {
+        // 检查选民资格
+        IVoterRegistry registry = IVoterRegistry(voterRegistry);
+        require(registry.isRegistered(msg.sender), "Voting: not registered voter");
+        require(!registry.hasVoted(msg.sender), "Voting: already voted in registry");
+
         require(_commitment != bytes32(0), "Voting: invalid commitment");
         require(
             voteRecords[_electionId][msg.sender].commitment == bytes32(0),
             "Voting: already voted"
         );
+
+        // 在 VoterRegistry 中标记已投票
+        registry.markAsVoted(msg.sender);
 
         voteRecords[_electionId][msg.sender] = VoteRecord({
             commitment: _commitment,

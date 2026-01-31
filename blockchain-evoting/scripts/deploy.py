@@ -144,13 +144,30 @@ def deploy_all(rpc_url: str, private_key: str):
     print('\n=== 部署 Merkle 验证合约 ===')
     merkle_addr = deployer.deploy_contract('MerkleVerifier.sol')
 
-    # 3. 部署投票合约
+    # 3. 部署投票合约（传入 VoterRegistry 地址）
     print('\n=== 部署投票合约 ===')
     voting_addr = deployer.deploy_contract(
         'Voting.sol',
-        registry_addr,
-        merkle_addr
+        registry_addr
     )
+
+    # 4. 设置 VoterRegistry 的授权投票合约地址
+    print('\n=== 配置合约权限 ===')
+    registry_contract = deployer.w3.eth.contract(
+        address=registry_addr,
+        abi=deployer.deployed['VoterRegistry']['abi']
+    )
+    nonce = deployer.w3.eth.get_transaction_count(deployer.account.address)
+    tx = registry_contract.functions.setVotingContract(voting_addr).build_transaction({
+        'from': deployer.account.address,
+        'nonce': nonce,
+        'gas': 100000,
+        'gasPrice': deployer.w3.eth.gas_price
+    })
+    signed = deployer.account.sign_transaction(tx)
+    tx_hash = deployer.w3.eth.send_raw_transaction(signed.rawTransaction)
+    deployer.w3.eth.wait_for_transaction_receipt(tx_hash)
+    print(f'VoterRegistry 已授权 Voting 合约: {voting_addr}')
 
     # 保存部署信息
     output_dir = Path(__file__).parent.parent / 'deployed'

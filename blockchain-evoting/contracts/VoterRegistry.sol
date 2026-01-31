@@ -12,6 +12,9 @@ contract VoterRegistry {
     /// @notice 合约管理员地址
     address public admin;
 
+    /// @notice 授权的投票合约地址
+    address public votingContract;
+
     /// @notice 选民信息结构体
     struct Voter {
         bool isRegistered;      // 是否已注册
@@ -36,6 +39,9 @@ contract VoterRegistry {
     /// @notice 管理员变更事件
     event AdminChanged(address indexed oldAdmin, address indexed newAdmin);
 
+    /// @notice 投票合约地址变更事件
+    event VotingContractChanged(address indexed oldContract, address indexed newContract);
+
     // ============ 修饰符 ============
 
     /// @notice 仅管理员可调用
@@ -47,6 +53,12 @@ contract VoterRegistry {
     /// @notice 仅已注册选民可调用
     modifier onlyRegistered() {
         require(voters[msg.sender].isRegistered, "VoterRegistry: not registered");
+        _;
+    }
+
+    /// @notice 仅授权的投票合约可调用
+    modifier onlyVotingContract() {
+        require(msg.sender == votingContract, "VoterRegistry: caller is not voting contract");
         _;
     }
 
@@ -96,15 +108,25 @@ contract VoterRegistry {
     }
 
     /**
-     * @notice 标记选民已投票（由投票合约调用）
+     * @notice 标记选民已投票（仅投票合约可调用）
      * @param _voter 选民地址
      */
-    function markAsVoted(address _voter) external {
+    function markAsVoted(address _voter) external onlyVotingContract {
         require(voters[_voter].isRegistered, "VoterRegistry: not registered");
         require(!voters[_voter].hasVoted, "VoterRegistry: already voted");
 
         voters[_voter].hasVoted = true;
         emit VoterStatusUpdated(_voter, true);
+    }
+
+    /**
+     * @notice 设置授权的投票合约地址
+     * @param _votingContract 投票合约地址
+     */
+    function setVotingContract(address _votingContract) external onlyAdmin {
+        require(_votingContract != address(0), "VoterRegistry: invalid address");
+        emit VotingContractChanged(votingContract, _votingContract);
+        votingContract = _votingContract;
     }
 
     /**
