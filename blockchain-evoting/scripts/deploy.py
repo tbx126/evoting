@@ -12,11 +12,12 @@ Smart Contract Deployment Script
 import json
 import os
 from pathlib import Path
+from datetime import datetime, timedelta
 from web3 import Web3
 from solcx import compile_standard, install_solc
 
 # 安装 Solidity 编译器
-install_solc('0.8.19')
+install_solc('0.8.20')
 
 
 class ContractDeployer:
@@ -59,7 +60,7 @@ class ContractDeployer:
                     '*': {'*': ['abi', 'evm.bytecode']}
                 }
             }
-        }, solc_version='0.8.19')
+        }, solc_version='0.8.20')
 
         contract_data = compiled['contracts'][filename][contract_name]
         return {
@@ -114,6 +115,32 @@ class ContractDeployer:
 
         return address
 
+    def call_contract_function(self, contract_name: str, function_name: str, *args):
+        """
+        调用合约函数
+
+        Args:
+            contract_name: 合约名称
+            function_name: 函数名称
+            *args: 函数参数
+        """
+        contract = self.w3.eth.contract(
+            address=self.deployed[contract_name]['address'],
+            abi=self.deployed[contract_name]['abi']
+        )
+        nonce = self.w3.eth.get_transaction_count(self.account.address)
+        func = getattr(contract.functions, function_name)
+        tx = func(*args).build_transaction({
+            'from': self.account.address,
+            'nonce': nonce,
+            'gas': 200000,
+            'gasPrice': self.w3.eth.gas_price
+        })
+        signed = self.account.sign_transaction(tx)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+        self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        print(f'调用 {contract_name}.{function_name}() 成功')
+
     def save_deployment(self, output_path: str):
         """
         保存部署信息到文件
@@ -126,15 +153,28 @@ class ContractDeployer:
         print(f'部署信息已保存: {output_path}')
 
 
-def deploy_all(rpc_url: str, private_key: str):
+def deploy_all(
+    rpc_url: str,
+    private_key: str,
+    title: str = "示例选举",
+    description: str = "这是一个区块链电子投票示例",
+    duration_hours: int = 24
+):
     """
     部署所有合约
 
     Args:
         rpc_url: RPC 节点地址
         private_key: 部署账户私钥
+        title: 选举标题
+        description: 选举描述
+        duration_hours: 选举持续时间（小时）
     """
     deployer = ContractDeployer(rpc_url, private_key)
+
+    # 计算选举时间
+    start_time = int(datetime.now().timestamp()) + 300  # 5分钟后开始
+    end_time = start_time + (duration_hours * 3600)
 
     # 1. 部署选民注册合约
     print('\n=== 部署选民注册合约 ===')
@@ -144,30 +184,24 @@ def deploy_all(rpc_url: str, private_key: str):
     print('\n=== 部署 Merkle 验证合约 ===')
     merkle_addr = deployer.deploy_contract('MerkleVerifier.sol')
 
-    # 3. 部署投票合约（传入 VoterRegistry 地址）
+    # 3. 部署投票合约（传入选举参数）
     print('\n=== 部署投票合约 ===')
+    print(f'选举标题: {title}')
+    print(f'开始时间: {datetime.fromtimestamp(start_time)}')
+    print(f'结束时间: {datetime.fromtimestamp(end_time)}')
     voting_addr = deployer.deploy_contract(
         'Voting.sol',
-        registry_addr
+        registry_addr,
+        title,
+        description,
+        start_time,
+        end_time
     )
 
     # 4. 设置 VoterRegistry 的授权投票合约地址
     print('\n=== 配置合约权限 ===')
-    registry_contract = deployer.w3.eth.contract(
-        address=registry_addr,
-        abi=deployer.deployed['VoterRegistry']['abi']
-    )
-    nonce = deployer.w3.eth.get_transaction_count(deployer.account.address)
-    tx = registry_contract.functions.setVotingContract(voting_addr).build_transaction({
-        'from': deployer.account.address,
-        'nonce': nonce,
-        'gas': 100000,
-        'gasPrice': deployer.w3.eth.gas_price
-    })
-    signed = deployer.account.sign_transaction(tx)
-    tx_hash = deployer.w3.eth.send_raw_transaction(signed.rawTransaction)
-    deployer.w3.eth.wait_for_transaction_receipt(tx_hash)
-    print(f'VoterRegistry 已授权 Voting 合约: {voting_addr}')
+    deployer.call_contract_function('VoterRegistry', 'setVotingContract', voting_addr)
+    print(f'VoterRegistry 已授权 Voting 合约')
 
     # 保存部署信息
     output_dir = Path(__file__).parent.parent / 'deployed'
@@ -200,6 +234,22 @@ if __name__ == '__main__':
         required=True,
         help='部署账户私钥'
     )
+    parser.add_argument(
+        '--title',
+        default='区块链电子投票',
+        help='选举标题'
+    )
+    parser.add_argument(
+        '--description',
+        default='基于以太坊的安全电子投票系统',
+        help='选举描述'
+    )
+    parser.add_argument(
+        '--duration',
+        type=int,
+        default=24,
+        help='选举持续时间（小时）'
+    )
 
     args = parser.parse_args()
 
@@ -211,4 +261,10 @@ if __name__ == '__main__':
         infura_id = os.getenv('INFURA_PROJECT_ID', '')
         rpc_url = f'https://{args.network}.infura.io/v3/{infura_id}'
 
-    deploy_all(rpc_url, args.key)
+    deploy_all(
+        rpc_url,
+        args.key,
+        title=args.title,
+        description=args.description,
+        duration_hours=args.duration
+    )
