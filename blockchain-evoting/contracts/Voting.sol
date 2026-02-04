@@ -14,6 +14,7 @@ interface IVoterRegistry {
  * @title Voting - 单一选举投票合约
  * @notice 管理单场选举的投票提交和结果统计
  * @dev 支持加密投票承诺，与 VoterRegistry 配合使用
+ *      选举由管理员手动开启和关闭，无时间限制
  */
 contract Voting {
     // ============ 状态变量 ============
@@ -40,12 +41,6 @@ contract Voting {
 
     /// @notice 选举描述
     string public description;
-
-    /// @notice 投票开始时间
-    uint256 public startTime;
-
-    /// @notice 投票结束时间
-    uint256 public endTime;
 
     /// @notice 候选人数量
     uint256 public candidateCount;
@@ -104,8 +99,6 @@ contract Voting {
 
     modifier electionActive() {
         require(status == ElectionStatus.Active, "Voting: not active");
-        require(block.timestamp >= startTime, "Voting: not started");
-        require(block.timestamp <= endTime, "Voting: ended");
         _;
     }
 
@@ -116,25 +109,18 @@ contract Voting {
      * @param _voterRegistry 选民注册合约地址
      * @param _title 选举标题
      * @param _description 选举描述
-     * @param _startTime 开始时间戳
-     * @param _endTime 结束时间戳
      */
     constructor(
         address _voterRegistry,
         string memory _title,
-        string memory _description,
-        uint256 _startTime,
-        uint256 _endTime
+        string memory _description
     ) {
         require(_voterRegistry != address(0), "Voting: invalid registry");
-        require(_startTime < _endTime, "Voting: invalid time range");
 
         admin = msg.sender;
         voterRegistry = _voterRegistry;
         title = _title;
         description = _description;
-        startTime = _startTime;
-        endTime = _endTime;
         status = ElectionStatus.Created;
 
         emit ElectionInitialized(_title);
@@ -158,7 +144,7 @@ contract Voting {
     }
 
     /**
-     * @notice 启动选举
+     * @notice 启动选举（管理员手动开启）
      */
     function startElection() external onlyAdmin inStatus(ElectionStatus.Created) {
         require(candidateCount >= 2, "Voting: need at least 2 candidates");
@@ -168,7 +154,7 @@ contract Voting {
     }
 
     /**
-     * @notice 结束选举
+     * @notice 结束选举（管理员手动关闭）
      */
     function endElection() external onlyAdmin inStatus(ElectionStatus.Active) {
         status = ElectionStatus.Ended;
@@ -244,13 +230,11 @@ contract Voting {
     function getElectionInfo() external view returns (
         string memory _title,
         string memory _description,
-        uint256 _startTime,
-        uint256 _endTime,
         ElectionStatus _status,
         uint256 _candidateCount,
         uint256 _totalVotes
     ) {
-        return (title, description, startTime, endTime, status, candidateCount, totalVotes);
+        return (title, description, status, candidateCount, totalVotes);
     }
 
     /**

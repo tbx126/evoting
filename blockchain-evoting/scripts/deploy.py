@@ -12,7 +12,6 @@ Smart Contract Deployment Script
 import json
 import os
 from pathlib import Path
-from datetime import datetime, timedelta
 from web3 import Web3
 from solcx import compile_standard, install_solc
 
@@ -157,8 +156,7 @@ def deploy_all(
     rpc_url: str,
     private_key: str,
     title: str = "示例选举",
-    description: str = "这是一个区块链电子投票示例",
-    duration_hours: int = 24
+    description: str = "这是一个区块链电子投票示例"
 ):
     """
     部署所有合约
@@ -168,13 +166,8 @@ def deploy_all(
         private_key: 部署账户私钥
         title: 选举标题
         description: 选举描述
-        duration_hours: 选举持续时间（小时）
     """
     deployer = ContractDeployer(rpc_url, private_key)
-
-    # 计算选举时间
-    start_time = int(datetime.now().timestamp()) + 300  # 5分钟后开始
-    end_time = start_time + (duration_hours * 3600)
 
     # 1. 部署选民注册合约
     print('\n=== 部署选民注册合约 ===')
@@ -184,18 +177,16 @@ def deploy_all(
     print('\n=== 部署 Merkle 验证合约 ===')
     merkle_addr = deployer.deploy_contract('MerkleVerifier.sol')
 
-    # 3. 部署投票合约（传入选举参数）
+    # 3. 部署投票合约（仅需标题和描述，由管理员手动控制选举）
     print('\n=== 部署投票合约 ===')
     print(f'选举标题: {title}')
-    print(f'开始时间: {datetime.fromtimestamp(start_time)}')
-    print(f'结束时间: {datetime.fromtimestamp(end_time)}')
+    print(f'选举描述: {description}')
+    print('注意: 选举由管理员手动开启和关闭')
     voting_addr = deployer.deploy_contract(
         'Voting.sol',
         registry_addr,
         title,
-        description,
-        start_time,
-        end_time
+        description
     )
 
     # 4. 设置 VoterRegistry 的授权投票合约地址
@@ -244,12 +235,6 @@ if __name__ == '__main__':
         default='基于以太坊的安全电子投票系统',
         help='选举描述'
     )
-    parser.add_argument(
-        '--duration',
-        type=int,
-        default=24,
-        help='选举持续时间（小时）'
-    )
 
     args = parser.parse_args()
 
@@ -265,6 +250,5 @@ if __name__ == '__main__':
         rpc_url,
         args.key,
         title=args.title,
-        description=args.description,
-        duration_hours=args.duration
+        description=args.description
     )
