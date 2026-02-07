@@ -1,20 +1,9 @@
 # 区块链电子投票系统 - Python 依赖
 # Blockchain E-Voting System - Python Dependencies
 
-# Web 框架
+# Web 框架（静态文件服务）
 fastapi==0.109.0
 uvicorn==0.27.0
-python-multipart==0.0.6
-
-# 数据库
-sqlalchemy==2.0.25
-aiosqlite==0.19.0
-
-# 认证
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-pydantic==2.5.3
-pydantic-settings==2.1.0
 
 # 区块链交互
 web3==6.14.0
@@ -25,5 +14,4 @@ phe==1.5.0
 pycryptodome==3.20.0
 
 # 工具
-python-dotenv==1.0.0
 httpx==0.26.0

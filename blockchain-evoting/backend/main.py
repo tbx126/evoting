@@ -1,28 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-区块链电子投票系统 - 后端主入口
-Blockchain E-Voting System - Backend Main Entry
-
-功能说明：
-- FastAPI 应用初始化
-- 路由注册
-- 中间件配置
+区块链电子投票系统 - 静态文件服务器
+Blockchain E-Voting System - Static File Server
 """
+
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
-from .database import init_db
-from .api import auth_router, voting_router, verify_router
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
-# 创建 FastAPI 应用
 app = FastAPI(
     title="区块链电子投票系统",
     description="基于以太坊的安全电子投票系统",
     version="1.0.0"
 )
 
-# 配置 CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,19 +26,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册路由
-app.include_router(auth_router)
-app.include_router(voting_router)
-app.include_router(verify_router)
-
-
-@app.on_event("startup")
-async def startup():
-    """应用启动时初始化数据库"""
-    await init_db()
-
 
 @app.get("/")
 async def root():
-    """根路由"""
-    return {"message": "区块链电子投票系统 API"}
+    """主页 - 选民投票页面"""
+    return FileResponse(FRONTEND_DIR / "voting-app.html")
+
+
+@app.get("/admin")
+async def admin_page():
+    """管理员控制台"""
+    return FileResponse(FRONTEND_DIR / "admin.html")
+
+
+@app.get("/config.js")
+async def config_js():
+    """合约配置文件（由 deploy.js 生成）"""
+    return FileResponse(FRONTEND_DIR / "config.js", media_type="application/javascript")

@@ -11,10 +11,11 @@ interface IVoterRegistry {
 }
 
 /**
- * @title Voting - 单一选举投票合约
+ * @title Voting - 单一选举投票合约（同态加密版本）
  * @notice 管理单场选举的投票提交和结果统计
- * @dev 支持加密投票承诺，与 VoterRegistry 配合使用
+ * @dev 支持 Paillier 同态加密投票，链下计票后上传结果
  *      选举由管理员手动开启和关闭，无时间限制
+ *      移除了 revealVote 机制，改用 updateTallyResults 上传计票结果
  */
 contract Voting {
     // ============ 状态变量 ============
@@ -29,7 +30,7 @@ contract Voting {
     enum ElectionStatus {
         Created,    // 已创建，可添加候选人
         Active,     // 进行中，可投票
-        Ended,      // 已结束，可揭示
+        Ended,      // 已结束，等待计票
         Tallied     // 已计票
     }
 
@@ -60,9 +61,9 @@ contract Voting {
 
     /// @notice 投票记录结构体
     struct VoteRecord {
-        bytes32 commitment;     // 投票承诺哈希
+        bytes32 commitment;     // 加密投票的承诺哈希
         uint256 timestamp;      // 投票时间
-        bool revealed;          // 是否已揭示
+        bool counted;           // 是否已计入结果
     }
 
     // ============ 映射 ============
@@ -81,7 +82,7 @@ contract Voting {
     event ElectionInitialized(string title);
     event CandidateAdded(uint256 indexed candidateId, string name);
     event VoteCast(address indexed voter, bytes32 commitment);
-    event VoteRevealed(address indexed voter, uint256 candidateId);
+    event TallyCompleted(uint256[] results, bytes32 merkleRoot);
     event ElectionStatusChanged(ElectionStatus newStatus);
     event MerkleRootUpdated(bytes32 root);
 
@@ -165,7 +166,7 @@ contract Voting {
 
     /**
      * @notice 提交投票承诺
-     * @param _commitment 投票承诺哈希 = keccak256(candidateId, salt)
+     * @param _commitment 加密投票的承诺哈希 = SHA256(encrypted_vote)
      */
     function castVote(bytes32 _commitment) external electionActive {
         // 检查选民资格
@@ -183,7 +184,7 @@ contract Voting {
         voteRecords[msg.sender] = VoteRecord({
             commitment: _commitment,
             timestamp: block.timestamp,
-            revealed: false
+            counted: false
         });
 
         commitments.push(_commitment);
@@ -193,24 +194,29 @@ contract Voting {
     }
 
     /**
-     * @notice 揭示投票（选举结束后）
-     * @param _candidateId 候选人ID
-     * @param _salt 盐值
+     * @notice 更新计票结果（管理员调用，链下同态计票后上传）
+     * @param _results 每个候选人的得票数数组
+     * @param _merkleRoot 投票的 Merkle 根哈希
      */
-    function revealVote(uint256 _candidateId, bytes32 _salt) external inStatus(ElectionStatus.Ended) {
-        VoteRecord storage record = voteRecords[msg.sender];
-        require(record.commitment != bytes32(0), "Voting: no vote found");
-        require(!record.revealed, "Voting: already revealed");
-        require(_candidateId < candidateCount, "Voting: invalid candidate");
+    function updateTallyResults(
+        uint256[] calldata _results,
+        bytes32 _merkleRoot
+    ) external onlyAdmin inStatus(ElectionStatus.Ended) {
+        require(_results.length == candidateCount, "Voting: invalid results length");
 
-        // 验证承诺
-        bytes32 computed = keccak256(abi.encodePacked(_candidateId, _salt));
-        require(computed == record.commitment, "Voting: invalid reveal");
+        uint256 totalVotesSum = 0;
+        for (uint256 i = 0; i < candidateCount; i++) {
+            candidates[i].voteCount = _results[i];
+            totalVotesSum += _results[i];
+        }
 
-        record.revealed = true;
-        candidates[_candidateId].voteCount++;
+        require(totalVotesSum == totalVotes, "Voting: vote count mismatch");
 
-        emit VoteRevealed(msg.sender, _candidateId);
+        merkleRoot = _merkleRoot;
+        status = ElectionStatus.Tallied;
+
+        emit TallyCompleted(_results, _merkleRoot);
+        emit ElectionStatusChanged(ElectionStatus.Tallied);
     }
 
     /**
@@ -257,10 +263,10 @@ contract Voting {
     function getVoteRecord(address _voter) external view returns (
         bytes32 commitment,
         uint256 timestamp,
-        bool revealed
+        bool counted
     ) {
         VoteRecord storage r = voteRecords[_voter];
-        return (r.commitment, r.timestamp, r.revealed);
+        return (r.commitment, r.timestamp, r.counted);
     }
 
     /**

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员控制台 - 区块链电子投票系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh; padding: 20px; color: #fff;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { font-size: 32px; margin-bottom: 10px; }
+        .header p { color: #888; font-size: 16px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px; padding: 25px; backdrop-filter: blur(10px);
+        }
+        .card-title {
+            font-size: 18px; margin-bottom: 20px; padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .card-title .icon { font-size: 24px; }
+        .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .status-item { background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; text-align: center; }
+        .status-label { font-size: 12px; color: #888; margin-bottom: 5px; }
+        .status-value { font-size: 20px; font-weight: bold; }
+        .status-value.active { color: #4ade80; }
+        .status-value.warning { color: #fbbf24; }
+        .btn {
+            width: 100%; padding: 12px 20px; border: none; border-radius: 8px;
+            font-size: 14px; cursor: pointer; transition: all 0.3s; margin-bottom: 10px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn:last-child { margin-bottom: 0; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
+        .input-group input {
+            width: 100%; padding: 12px 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05); color: white;
+            font-size: 14px; font-family: 'Consolas', monospace;
+        }
+        .input-group input:focus { outline: none; border-color: #667eea; }
+        .input-group input::placeholder { color: #666; }
+        .candidate-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 15px; background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px; margin-bottom: 10px;
+        }
+        .candidate-item .name { font-weight: bold; }
+        .candidate-item .votes { color: #4ade80; font-size: 18px; font-weight: bold; }
+        .log-container {
+            background: #0d1117; border-radius: 10px; padding: 15px;
+            max-height: 250px; overflow-y: auto;
+            font-family: 'Consolas', monospace; font-size: 12px;
+        }
+        .log-entry { padding: 5px 0; border-bottom: 1px solid #21262d; }
+        .log-entry:last-child { border-bottom: none; }
+        .log-time { color: #666; }
+        .log-info { color: #58a6ff; }
+        .log-success { color: #4ade80; }
+        .log-warning { color: #fbbf24; }
+        .log-error { color: #f87171; }
+        .alert { padding: 12px 15px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; }
+        .alert-info { background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.3); color: #58a6ff; }
+        .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .tally-input { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .tally-input label { font-size: 14px; }
+        .tally-input input { width: 80px; padding: 8px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; background: rgba(255, 255, 255, 0.05); color: white; text-align: center; }
+        .connection-status { display: flex; align-items: center; gap: 10px; padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; margin-bottom: 20px; }
+        .connection-dot { width: 12px; height: 12px; border-radius: 50%; background: #f87171; }
+        .connection-dot.connected { background: #4ade80; }
+        .connection-info { flex: 1; }
+        .connection-info .label { font-size: 12px; color: #888; }
+        .connection-info .value { font-size: 14px; font-family: 'Consolas', monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ 管理员控制台</h1>
+            <p>区块链电子投票系统 - Sepolia 测试网</p>
+        </div>
+
+        <div class="connection-status">
+            <div class="connection-dot" id="connectionDot"></div>
+            <div class="connection-info">
+                <div class="label">管理员账户</div>
+                <div class="value" id="adminAddress">未连接</div>
+            </div>
+            <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()" style="width: auto;">🦊 连接钱包</button>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-title"><span class="icon">📊</span>选举状态</div>
+                <div class="status-grid">
+                    <div class="status-item"><div class="status-label">当前状态</div><div class="status-value" id="electionStatus">-</div></div>
+                    <div class="status-item"><div class="status-label">候选人数</div><div class="status-value" id="candidateCount">-</div></div>
+                    <div class="status-item"><div class="status-label">已注册选民</div><div class="status-value" id="voterCount">-</div></div>
+                    <div class="status-item"><div class="status-label">已投票数</div><div class="status-value" id="voteCount">-</div></div>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-success" id="startBtn" onclick="startElection()" disabled>▶️ 启动选举</button>
+                    <button class="btn btn-danger" id="endBtn" onclick="endElection()" disabled>⏹️ 结束选举</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">👥</span>选民管理</div>
+                <div class="input-group">
+                    <label>选民地址</label>
+                    <input type="text" id="voterAddress" placeholder="0x..." />
+                </div>
+                <button class="btn btn-primary" id="registerBtn" onclick="registerVoter()" disabled>➕ 注册选民</button>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">🏆</span>候选人管理</div>
+                <div class="input-group">
+                    <label>候选人姓名</label>
+                    <input type="text" id="candidateName" placeholder="输入候选人姓名" />
+                </div>
+                <button class="btn btn-primary" id="addCandidateBtn" onclick="addCandidate()" disabled>➕ 添加候选人</button>
+                <div id="candidateList" style="margin-top: 15px;"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">📝</span>计票管理</div>
+                <div class="alert alert-info">计票流程：结束选举 → 链下同态计票 → 上传结果</div>
+                <div id="tallyInputs"></div>
+                <button class="btn btn-warning" id="tallyBtn" onclick="submitTally()" disabled>📊 上传计票结果</button>
+            </div>
+
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-title"><span class="icon">📋</span>操作日志</div>
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry"><span class="log-time">[系统]</span> <span class="log-info">请连接管理员钱包</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.9.0/ethers.umd.min.js"></script>
+    <script src="config.js"></script>
+    <script>
+        const VOTING_ADDRESS = CONTRACT_CONFIG.VOTING_ADDRESS;
+        const VOTER_REGISTRY_ADDRESS = CONTRACT_CONFIG.VOTER_REGISTRY_ADDRESS;
+
+        const VOTING_ABI = [
+            "function getElectionInfo() view returns (string, string, uint8, uint256, uint256)",
+            "function getCandidate(uint256) view returns (string, uint256)",
+            "function addCandidate(string)",
+            "function startElection()",
+            "function endElection()",
+            "function updateTallyResults(uint256[], bytes32)",
+            "function admin() view returns (address)"
+        ];
+
+        const VOTER_REGISTRY_ABI = [
+            "function registerVoter(address)",
+            "function isRegistered(address) view returns (bool)",
+            "function hasVoted(address) view returns (bool)",
+            "function totalVoters() view returns (uint256)",
+            "function admin() view returns (address)"
+        ];
+
+        let provider, signer, votingContract, voterRegistryContract, currentAccount;
+        let candidates = [];
+        const STATUS_NAMES = ["已创建", "进行中", "已结束", "已计票"];
+
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${message}</span>`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function connectWallet() {
+            if (typeof window.ethereum === 'undefined') {
+                addLog('请安装 MetaMask！访问 https://metamask.io 下载', 'error');
+                return;
+            }
+
+            try {
+                addLog('正在连接钱包...', 'info');
+                provider = new ethers.BrowserProvider(window.ethereum);
+                const accounts = await provider.send("eth_requestAccounts", []);
+                currentAccount = accounts[0];
+
+                const network = await provider.getNetwork();
+                if (network.chainId !== 11155111n) {
+                    addLog('请切换到 Sepolia 测试网', 'warning');
+                    try {
+                        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xaa36a7' }] });
+                    } catch (switchError) {
+                        if (switchError.code === 4902) {
+                            addLog('正在添加 Sepolia 测试网...', 'info');
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [{
+                                    chainId: '0xaa36a7',
+                                    chainName: 'Sepolia Testnet',
+                                    nativeCurrency: { name: 'SepoliaETH', symbol: 'ETH', decimals: 18 },
+                                    rpcUrls: ['https://rpc.sepolia.org'],
+                                    blockExplorerUrls: ['https://sepolia.etherscan.io']
+                                }]
+                            });
+                        } else {
+                            throw switchError;
+                        }
+                    }
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                }
+
+                signer = await provider.getSigner();
+                votingContract = new ethers.Contract(VOTING_ADDRESS, VOTING_ABI, signer);
+                voterRegistryContract = new ethers.Contract(VOTER_REGISTRY_ADDRESS, VOTER_REGISTRY_ABI, signer);
+
+                const votingAdmin = await votingContract.admin();
+                if (votingAdmin.toLowerCase() !== currentAccount.toLowerCase()) {
+                    addLog('⚠️ 当前账户不是管理员！', 'warning');
+                    addLog(`管理员地址: ${votingAdmin}`, 'info');
+                }
+
+                document.getElementById('connectionDot').classList.add('connected');
+                document.getElementById('adminAddress').textContent = currentAccount;
+                document.getElementById('connectBtn').textContent = '✅ 已连接';
+                document.getElementById('connectBtn').disabled = true;
+
+                addLog(`已连接: ${currentAccount.slice(0, 10)}...`, 'success');
+                await loadElectionInfo();
+
+                window.ethereum.on('accountsChanged', () => window.location.reload());
+                window.ethereum.on('chainChanged', () => window.location.reload());
+
+            } catch (error) {
+                if (error.code === 4001) {
+                    addLog('用户拒绝了连接请求', 'warning');
+                } else {
+                    addLog(`连接失败: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function loadElectionInfo() {
+            try {
+                const info = await votingContract.getElectionInfo();
+                const status = Number(info[2]);
+                const candidateCount = Number(info[3]);
+                const totalVotes = Number(info[4]);
+                const totalVoters = await voterRegistryContract.totalVoters();
+
+                document.getElementById('electionStatus').textContent = STATUS_NAMES[status];
+                document.getElementById('electionStatus').className = 'status-value ' + (status === 1 ? 'active' : status === 0 ? 'warning' : '');
+                document.getElementById('candidateCount').textContent = candidateCount;
+                document.getElementById('voterCount').textContent = totalVoters.toString();
+                document.getElementById('voteCount').textContent = totalVotes;
+
+                document.getElementById('startBtn').disabled = status !== 0;
+                document.getElementById('endBtn').disabled = status !== 1;
+                document.getElementById('addCandidateBtn').disabled = status !== 0;
+                document.getElementById('registerBtn').disabled = false;
+                document.getElementById('tallyBtn').disabled = status !== 2;
+
+                candidates = [];
+                const candidateList = document.getElementById('candidateList');
+                candidateList.innerHTML = '';
+                const tallyInputs = document.getElementById('tallyInputs');
+                tallyInputs.innerHTML = '';
+
+                for (let i = 0; i < candidateCount; i++) {
+                    const candidate = await votingContract.getCandidate(i);
+                    candidates.push({ id: i, name: candidate[0], votes: Number(candidate[1]) });
+
+                    candidateList.innerHTML += `<div class="candidate-item"><span class="name">${candidate[0]}</span><span class="votes">${candidate[1]} 票</span></div>`;
+                    tallyInputs.innerHTML += `<div class="tally-input"><label>${candidate[0]} 得票数:</label><input type="number" id="tally-${i}" value="0" min="0" /></div>`;
+                }
+
+                addLog('选举信息已加载', 'success');
+
+            } catch (error) {
+                addLog(`加载失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function registerVoter() {
+            const address = document.getElementById('voterAddress').value.trim();
+            if (!address || !address.startsWith('0x') || address.length !== 42) {
+                addLog('请输入有效的以太坊地址', 'warning');
+                return;
+            }
+
+            try {
+                const btn = document.getElementById('registerBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span> 注册中...';
+
+                const isRegistered = await voterRegistryContract.isRegistered(address);
+                if (isRegistered) {
+                    addLog('该地址已注册', 'warning');
+                    btn.disabled = false;
+                    btn.innerHTML = '➕ 注册选民';
+                    return;
+                }
+
+                addLog(`正在注册选民: ${address.slice(0, 10)}...`, 'info');
+                addLog('⚠️ 请在 MetaMask 中确认交易（如未弹窗，点击浏览器工具栏的 MetaMask 图标）', 'warning');
+                const tx = await voterRegistryContract.registerVoter(address);
+                addLog('⏳ 等待交易确认...', 'info');
+                await tx.wait();
+                addLog(`✅ 选民注册成功！`, 'success');
+
+                document.getElementById('voterAddress').value = '';
+                await loadElectionInfo();
+                btn.disabled = false;
+                btn.innerHTML = '➕ 注册选民';
+
+            } catch (error) {
+                addLog(`注册失败: ${error.message}`, 'error');
+                document.getElementById('registerBtn').disabled = false;
+                document.getElementById('registerBtn').innerHTML = '➕ 注册选民';
+            }
+        }
+
+        async function addCandidate() {
+            const name = document.getElementById('candidateName').value.trim();
+            if (!name) {
+                addLog('请输入候选人姓名', 'warning');
+                return;
+            }
+
+            try {
+                const btn = document.getElementById('addCandidateBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span> 添加中...';
+
+                addLog(`正在添加候选人: ${name}`, 'info');
+                addLog('⚠️ 请在 MetaMask 中确认交易', 'warning');
+                const tx = await votingContract.addCandidate(name);
+                addLog('⏳ 等待交易确认...', 'info');
+                await tx.wait();
+                addLog(`✅ 候选人添加成功！`, 'success');
+
+                document.getElementById('candidateName').value = '';
+                await loadElectionInfo();
+                btn.disabled = false;
+                btn.innerHTML = '➕ 添加候选人';
+
+            } catch (error) {
+                addLog(`添加失败: ${error.message}`, 'error');
+                document.getElementById('addCandidateBtn').disabled = false;
+                document.getElementById('addCandidateBtn').innerHTML = '➕ 添加候选人';
+            }
+        }
+
+        async function startElection() {
+            try {
+                const btn = document.getElementById('startBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span> 启动中...';
+
+                addLog('正在启动选举...', 'info');
+                addLog('⚠️ 请在 MetaMask 中确认交易', 'warning');
+                const tx = await votingContract.startElection();
+                addLog('⏳ 等待交易确认...', 'info');
+                await tx.wait();
+                addLog(`✅ 选举已启动！`, 'success');
+                await loadElectionInfo();
+
+            } catch (error) {
+                addLog(`启动失败: ${error.message}`, 'error');
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('startBtn').innerHTML = '▶️ 启动选举';
+            }
+        }
+
+        async function endElection() {
+            if (!confirm('确定要结束选举吗？')) return;
+
+            try {
+                const btn = document.getElementById('endBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span> 结束中...';
+
+                addLog('正在结束选举...', 'info');
+                addLog('⚠️ 请在 MetaMask 中确认交易', 'warning');
+                const tx = await votingContract.endElection();
+                addLog('⏳ 等待交易确认...', 'info');
+                await tx.wait();
+                addLog(`✅ 选举已结束！`, 'success');
+                await loadElectionInfo();
+
+            } catch (error) {
+                addLog(`结束失败: ${error.message}`, 'error');
+                document.getElementById('endBtn').disabled = false;
+                document.getElementById('endBtn').innerHTML = '⏹️ 结束选举';
+            }
+        }
+
+        async function submitTally() {
+            try {
+                const results = [];
+                let total = 0;
+
+                for (let i = 0; i < candidates.length; i++) {
+                    const votes = parseInt(document.getElementById(`tally-${i}`).value) || 0;
+                    results.push(votes);
+                    total += votes;
+                }
+
+                const info = await votingContract.getElectionInfo();
+                const expectedTotal = Number(info[4]);
+
+                if (total !== expectedTotal) {
+                    addLog(`票数不匹配！输入: ${total}, 期望: ${expectedTotal}`, 'error');
+                    return;
+                }
+
+                const btn = document.getElementById('tallyBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span> 上传中...';
+
+                const merkleRoot = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(results)));
+
+                addLog(`正在上传计票结果: [${results.join(', ')}]`, 'info');
+                addLog('⚠️ 请在 MetaMask 中确认交易', 'warning');
+                const tx = await votingContract.updateTallyResults(results, merkleRoot);
+                addLog('⏳ 等待交易确认...', 'info');
+                await tx.wait();
+                addLog(`✅ 计票结果已上传！`, 'success');
+                await loadElectionInfo();
+
+            } catch (error) {
+                addLog(`上传失败: ${error.message}`, 'error');
+                document.getElementById('tallyBtn').disabled = false;
+                document.getElementById('tallyBtn').innerHTML = '📊 上传计票结果';
+            }
+        }
+
+        window.addEventListener('load', async () => {
+            addLog('管理员控制台已加载', 'info');
+            if (typeof window.ethereum !== 'undefined') {
+                addLog('检测到 MetaMask', 'info');
+                // 自动连接已授权的账户
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    addLog('发现已授权账户，自动连接...', 'info');
+                    connectWallet();
+                } else {
+                    addLog('请点击连接钱包', 'info');
+                }
+            } else {
+                addLog('未检测到 MetaMask，请安装: https://metamask.io', 'warning');
+            }
+        });
+    </script>
+</body>
+</html>
