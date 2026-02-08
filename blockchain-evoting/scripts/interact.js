@@ -50,12 +50,13 @@ async function main() {
       break;
 
     case "cast-vote":
-      const commitment = args[1];
-      if (!commitment) {
-        console.log("用法: npx hardhat run scripts/interact.js --network sepolia -- cast-vote <承诺哈希>");
+      const candidateIdArg = args[1];
+      if (!candidateIdArg) {
+        console.log("用法: npx hardhat run scripts/interact.js --network sepolia -- cast-vote <候选人ID>");
+        console.log("  注: 现需 ZKP 证明，请使用 full-demo.js 进行完整投票流程");
         return;
       }
-      await castVote(voting, commitment);
+      await castVoteZKP(voting, parseInt(candidateIdArg));
       break;
 
     case "end-election":
@@ -73,13 +74,13 @@ async function main() {
   add-candidates  - 添加候选人 (Alice, Bob, Charlie)
   register-voter <地址> - 注册选民
   start-election  - 启动选举
-  cast-vote <承诺> - 投票
+  cast-vote <ID>  - 投票 (需 ZKP, 建议用 full-demo.js)
   end-election    - 结束选举
-  full-demo       - 运行完整演示
+  full-demo       - 运行完整演示 (建议用 scripts/full-demo.js)
 
 示例:
   npx hardhat run scripts/interact.js --network sepolia -- status
-  npx hardhat run scripts/interact.js --network sepolia -- full-demo
+  npx hardhat run scripts/full-demo.js --network sepolia
       `);
   }
 }
@@ -149,13 +150,11 @@ async function startElection(voting) {
   console.log("✓ 选举已启动，选民现在可以投票");
 }
 
-async function castVote(voting, commitment) {
-  console.log(`\n投票中...`);
-  console.log(`  承诺哈希: ${commitment}`);
-
-  const tx = await voting.castVote(commitment);
-  await tx.wait();
-  console.log("✓ 投票成功");
+async function castVoteZKP(voting, candidateId) {
+  console.log(`\n投票中 (ZKP)...`);
+  console.log(`  候选人 ID: ${candidateId}`);
+  console.log("  注: ZKP 投票需要 full-demo.js，此命令仅供参考");
+  console.log("  请运行: npx hardhat run scripts/full-demo.js --network sepolia");
 }
 
 async function endElection(voting) {
@@ -199,16 +198,12 @@ async function fullDemo(voting, voterRegistry, admin) {
     console.log("\n步骤 3: 选举已启动，跳过");
   }
 
-  // 5. 投票
+  // 5. 投票 (需要 ZKP)
   const hasVoted = await voterRegistry.hasVoted(admin.address);
   if (!hasVoted && currentStatus <= 1) {
-    console.log("\n步骤 4: 投票");
-    // 生成一个模拟的承诺哈希
-    const commitment = hre.ethers.keccak256(
-      hre.ethers.toUtf8Bytes("vote_for_alice_" + Date.now())
-    );
-    console.log(`  承诺哈希: ${commitment}`);
-    await castVote(voting, commitment);
+    console.log("\n步骤 4: 投票 (ZKP)");
+    console.log("  注: ZKP 投票需要使用 scripts/full-demo.js");
+    console.log("  请运行: npx hardhat run scripts/full-demo.js --network sepolia");
   } else if (hasVoted) {
     console.log("\n步骤 4: 已投票，跳过");
   }

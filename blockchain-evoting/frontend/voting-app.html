@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>区块链电子投票系统</title>
+    <title>区块链电子投票系统 (ZKP)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -89,13 +89,18 @@
         .tx-link:hover { text-decoration: underline; }
         .loading { display: inline-block; width: 20px; height: 20px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .zkp-badge {
+            display: inline-block; padding: 4px 10px; border-radius: 20px;
+            background: linear-gradient(135deg, #00b09b, #96c93d); color: white;
+            font-size: 12px; font-weight: bold; margin-left: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card">
-            <h1>🗳️ 区块链电子投票系统</h1>
-            <h2>2026 年度最佳员工评选 - Sepolia 测试网</h2>
+            <h1>区块链电子投票系统 <span class="zkp-badge">ZKP</span></h1>
+            <h2>2026 年度最佳员工评选 - Sepolia 测试网 (零知识证明版)</h2>
             <div class="status-bar">
                 <div class="status-item">
                     <div class="status-label">钱包状态</div>
@@ -114,20 +119,20 @@
                     <div class="status-value" id="totalVotes">-</div>
                 </div>
             </div>
-            <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()">🦊 连接 MetaMask</button>
+            <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()">连接 MetaMask</button>
         </div>
 
         <div class="alert alert-warning" id="notRegisteredAlert" style="display: none;">
-            ⚠️ 你的账户尚未注册为选民，请联系管理员注册后再投票。
+            你的账户尚未注册为选民，请联系管理员注册后再投票。
         </div>
         <div class="alert alert-success" id="alreadyVotedAlert" style="display: none;">
-            ✅ 你已经投过票了！感谢你的参与。
+            你已经投过票了！感谢你的参与。
         </div>
 
         <div class="card" id="votingCard" style="display: none;">
             <div class="section-title">选择你支持的候选人</div>
             <div class="candidates" id="candidatesList"></div>
-            <button class="btn btn-primary" id="voteBtn" onclick="submitVote()" disabled>🗳️ 提交投票</button>
+            <button class="btn btn-primary" id="voteBtn" onclick="submitVote()" disabled>提交投票 (ZKP)</button>
         </div>
 
         <div class="card">
@@ -141,11 +146,16 @@
             <div class="section-title">合约信息</div>
             <p><strong>Voting:</strong> <a class="tx-link" id="contractLink" href="#" target="_blank"></a></p>
             <p><strong>网络:</strong> Sepolia (Chain ID: 11155111)</p>
+            <p><strong>ZKP:</strong> Groth16 on BN254 + ElGamal on BabyJubJub</p>
         </div>
     </div>
 
+    <!-- Dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.9.0/ethers.umd.min.js"></script>
+    <script src="https://unpkg.com/snarkjs@0.7.3/build/snarkjs.min.js"></script>
+    <script src="https://unpkg.com/circomlibjs@0.1.7/build/circomlibjs.umd.js"></script>
     <script src="config.js"></script>
+    <script src="lib/elgamal.js"></script>
     <script>
         const VOTING_ADDRESS = CONTRACT_CONFIG.VOTING_ADDRESS;
         const VOTER_REGISTRY_ADDRESS = CONTRACT_CONFIG.VOTER_REGISTRY_ADDRESS;
@@ -153,8 +163,10 @@
         const VOTING_ABI = [
             "function getElectionInfo() view returns (string, string, uint8, uint256, uint256)",
             "function getCandidate(uint256) view returns (string, uint256)",
-            "function castVote(bytes32)",
-            "function getVoteRecord(address) view returns (bytes32, uint256, bool)"
+            "function castVote(bytes32, bytes32, uint256[2], uint256[2][2], uint256[2], uint256[])",
+            "function getVoteRecord(address) view returns (bytes32, bytes32, uint256, bool)",
+            "function getElgamalPK() view returns (uint256[2])",
+            "function getAllCandidates() view returns (tuple(uint256 id, string name, uint256 voteCount)[])"
         ];
 
         const VOTER_REGISTRY_ABI = [
@@ -165,6 +177,8 @@
         let provider, signer, votingContract, voterRegistryContract, currentAccount;
         let selectedCandidate = null;
         let candidates = [];
+        let elgamal = null; // Initialized ElGamal library
+        let adminPK = null; // ElGamal public key from contract
         const STATUS_NAMES = ["已创建", "进行中", "已结束", "已计票"];
 
         function addLog(message, type = 'info') {
@@ -175,6 +189,16 @@
             entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${message}</span>`;
             container.appendChild(entry);
             container.scrollTop = container.scrollHeight;
+        }
+
+        async function initZKP() {
+            try {
+                addLog('正在初始化零知识证明库...', 'info');
+                elgamal = await ElGamalLib.init();
+                addLog('ZKP 库初始化成功', 'success');
+            } catch (error) {
+                addLog(`ZKP 库初始化失败: ${error.message}`, 'error');
+            }
         }
 
         async function connectWallet() {
@@ -192,7 +216,6 @@
                 currentAccount = accounts[0];
                 addLog(`已连接: ${currentAccount.slice(0, 10)}...`, 'success');
 
-                // 检查网络
                 const network = await provider.getNetwork();
                 if (network.chainId !== 11155111n) {
                     addLog('请切换到 Sepolia 测试网！', 'warning');
@@ -203,7 +226,6 @@
                         });
                     } catch (switchError) {
                         if (switchError.code === 4902) {
-                            addLog('正在添加 Sepolia 测试网...', 'info');
                             await window.ethereum.request({
                                 method: 'wallet_addEthereumChain',
                                 params: [{
@@ -229,8 +251,19 @@
                 document.getElementById('walletStatus').textContent = '已连接';
                 document.getElementById('walletStatus').className = 'status-value connected';
                 document.getElementById('accountAddress').textContent = currentAccount.slice(0, 6) + '...' + currentAccount.slice(-4);
-                document.getElementById('connectBtn').textContent = '✅ 已连接';
+                document.getElementById('connectBtn').textContent = '已连接';
                 document.getElementById('connectBtn').disabled = true;
+
+                // Load ElGamal public key from contract
+                try {
+                    const pk = await votingContract.getElgamalPK();
+                    adminPK = elgamal.pkFromBigInts(pk[0].toString(), pk[1].toString());
+                    addLog('已加载 ElGamal 公钥', 'success');
+                } catch (e) {
+                    // Fallback to config
+                    adminPK = elgamal.pkFromBigInts(CONTRACT_CONFIG.ELGAMAL_PK.x, CONTRACT_CONFIG.ELGAMAL_PK.y);
+                    addLog('使用配置中的 ElGamal 公钥', 'info');
+                }
 
                 await loadElectionInfo();
 
@@ -283,7 +316,7 @@
                             <div class="candidate-name">${candidate[0]}</div>
                             <div class="candidate-votes">当前得票: ${candidate[1]}</div>
                         </div>
-                        <div class="candidate-check" id="check-${i}">✓</div>
+                        <div class="candidate-check" id="check-${i}">&#10003;</div>
                     `;
                     candidatesList.appendChild(card);
                 }
@@ -309,48 +342,112 @@
         }
 
         async function submitVote() {
-            if (selectedCandidate === null) return;
+            if (selectedCandidate === null || !elgamal) return;
 
             try {
                 const voteBtn = document.getElementById('voteBtn');
                 voteBtn.disabled = true;
-                voteBtn.innerHTML = '<span class="loading"></span> 投票中...';
+                voteBtn.innerHTML = '<span class="loading"></span> 生成零知识证明...';
 
-                addLog(`正在为 ${candidates[selectedCandidate].name} 投票...`, 'info');
+                const numCandidates = candidates.length;
+                addLog(`正在为 ${candidates[selectedCandidate].name} 生成加密投票...`, 'info');
 
-                const voteData = `vote_${selectedCandidate}_${currentAccount}_${Date.now()}`;
-                const commitment = ethers.keccak256(ethers.toUtf8Bytes(voteData));
+                // 1. Generate random salt
+                const salt = elgamal.randomFieldElement();
 
-                addLog(`承诺哈希: ${commitment.slice(0, 20)}...`, 'info');
-                addLog('⚠️ 请在 MetaMask 中确认交易（如未弹窗，点击浏览器工具栏的 MetaMask 图标）', 'warning');
+                // 2. Encrypt vote as one-hot vector
+                const { ciphertexts, randomness } = elgamal.encryptVoteOneHot(
+                    selectedCandidate, numCandidates, adminPK
+                );
+                addLog('ElGamal 加密完成 (one-hot 向量)', 'success');
 
-                const tx = await votingContract.castVote(commitment);
-                addLog(`⏳ 交易已发送，等待确认...`, 'info');
+                // 3. Compute Poseidon commitment and ciphertext hash
+                const commitment = elgamal.computeCommitment(selectedCandidate, salt);
+                const ciphertextHash = elgamal.computeCiphertextHash(ciphertexts);
+                addLog(`Poseidon 承诺: ${commitment.toString().slice(0, 20)}...`, 'info');
+
+                // 4. Prepare witness for ZKP circuit
+                const witness = elgamal.prepareVoteWitness(
+                    selectedCandidate, numCandidates, salt, adminPK, ciphertexts, randomness
+                );
+
+                // 5. Generate ZKP proof
+                addLog('正在生成 Groth16 零知识证明 (约 1-3 秒)...', 'info');
+                voteBtn.innerHTML = '<span class="loading"></span> ZKP 证明生成中...';
+
+                const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+                    witness.input,
+                    CONTRACT_CONFIG.ZKP.VOTE_PROOF_WASM,
+                    CONTRACT_CONFIG.ZKP.VOTE_PROOF_ZKEY
+                );
+                addLog('ZKP 证明生成成功!', 'success');
+
+                // 6. Convert proof to Solidity calldata format
+                const calldataStr = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
+                const calldata = JSON.parse(`[${calldataStr}]`);
+
+                const pA = calldata[0];
+                const pB = calldata[1];
+                const pC = calldata[2];
+
+                // 7. Prepare encrypted vote data for event
+                const encryptedVoteArray = elgamal.ciphertextsToUint256Array(ciphertexts);
+
+                // 8. Convert commitment and ciphertextHash to bytes32
+                const commitmentHex = "0x" + commitment.toString(16).padStart(64, "0");
+                const ciphertextHashHex = "0x" + ciphertextHash.toString(16).padStart(64, "0");
+
+                // 9. Submit to contract
+                addLog('请在 MetaMask 中确认交易', 'warning');
+                voteBtn.innerHTML = '<span class="loading"></span> 等待确认...';
+
+                const tx = await votingContract.castVote(
+                    commitmentHex,
+                    ciphertextHashHex,
+                    pA,
+                    pB,
+                    pC,
+                    encryptedVoteArray.map(x => x.toString())
+                );
+                addLog('交易已发送，等待确认...', 'info');
 
                 await tx.wait();
 
-                addLog(`✅ 投票成功！`, 'success');
+                addLog('投票成功! (含零知识证明)', 'success');
                 addLog(`<a class="tx-link" href="https://sepolia.etherscan.io/tx/${tx.hash}" target="_blank">查看交易</a>`, 'success');
 
+                // Save salt to localStorage for later verification
+                const voteReceipt = {
+                    candidateId: selectedCandidate,
+                    salt: salt.toString(),
+                    commitment: commitment.toString(),
+                    txHash: tx.hash,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem(`vote_receipt_${currentAccount}`, JSON.stringify(voteReceipt));
+                addLog('投票凭证已保存到本地 (可用于事后验证)', 'info');
+
                 await loadElectionInfo();
-                voteBtn.innerHTML = '✅ 已投票';
+                voteBtn.innerHTML = '已投票';
 
             } catch (error) {
                 addLog(`投票失败: ${error.message}`, 'error');
+                console.error('Vote error:', error);
                 document.getElementById('voteBtn').disabled = false;
-                document.getElementById('voteBtn').innerHTML = '🗳️ 提交投票';
+                document.getElementById('voteBtn').innerHTML = '提交投票 (ZKP)';
             }
         }
 
         window.addEventListener('load', async () => {
-            // 显示合约地址
             const link = document.getElementById('contractLink');
             link.href = `https://sepolia.etherscan.io/address/${VOTING_ADDRESS}`;
             link.textContent = VOTING_ADDRESS.slice(0, 9) + '...' + VOTING_ADDRESS.slice(-8);
 
+            // Initialize ZKP library
+            await initZKP();
+
             if (typeof window.ethereum !== 'undefined') {
                 addLog('检测到 MetaMask', 'info');
-                // 自动连接已授权的账户
                 const accounts = await window.ethereum.request({ method: 'eth_accounts' });
                 if (accounts.length > 0) {
                     addLog('发现已授权账户，自动连接...', 'info');

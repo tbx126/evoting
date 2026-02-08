@@ -47,6 +47,16 @@ async function main() {
     console.log("\n候选人列表: (暂无)");
   }
 
+  // ElGamal 公钥
+  try {
+    const pk = await voting.getElgamalPK();
+    console.log("\nElGamal 公钥 (ZKP):");
+    console.log("  PK.x:", pk[0].toString().slice(0, 30) + "...");
+    console.log("  PK.y:", pk[1].toString().slice(0, 30) + "...");
+  } catch (e) {
+    // Contract may not have getElgamalPK
+  }
+
   const totalVoters = await voterRegistry.totalVoters();
   console.log("\n选民信息:");
   console.log("  已注册选民数:", totalVoters.toString());

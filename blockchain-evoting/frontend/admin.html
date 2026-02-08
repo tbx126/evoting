@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理员控制台 - 区块链电子投票系统</title>
+    <title>管理员控制台 - 区块链电子投票系统 (ZKP)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -47,14 +47,14 @@
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         .input-group { margin-bottom: 15px; }
         .input-group label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
-        .input-group input {
+        .input-group input, .input-group textarea {
             width: 100%; padding: 12px 15px;
             border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px;
             background: rgba(255, 255, 255, 0.05); color: white;
             font-size: 14px; font-family: 'Consolas', monospace;
         }
-        .input-group input:focus { outline: none; border-color: #667eea; }
-        .input-group input::placeholder { color: #666; }
+        .input-group input:focus, .input-group textarea:focus { outline: none; border-color: #667eea; }
+        .input-group input::placeholder, .input-group textarea::placeholder { color: #666; }
         .candidate-item {
             display: flex; justify-content: space-between; align-items: center;
             padding: 12px 15px; background: rgba(255, 255, 255, 0.05);
@@ -78,22 +78,24 @@
         .alert-info { background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.3); color: #58a6ff; }
         .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .tally-input { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin-bottom: 10px; }
-        .tally-input label { font-size: 14px; }
-        .tally-input input { width: 80px; padding: 8px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; background: rgba(255, 255, 255, 0.05); color: white; text-align: center; }
         .connection-status { display: flex; align-items: center; gap: 10px; padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; margin-bottom: 20px; }
         .connection-dot { width: 12px; height: 12px; border-radius: 50%; background: #f87171; }
         .connection-dot.connected { background: #4ade80; }
         .connection-info { flex: 1; }
         .connection-info .label { font-size: 12px; color: #888; }
         .connection-info .value { font-size: 14px; font-family: 'Consolas', monospace; }
+        .zkp-badge {
+            display: inline-block; padding: 3px 8px; border-radius: 12px;
+            background: linear-gradient(135deg, #00b09b, #96c93d); color: white;
+            font-size: 11px; font-weight: bold; margin-left: 8px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>⚙️ 管理员控制台</h1>
-            <p>区块链电子投票系统 - Sepolia 测试网</p>
+            <h1>管理员控制台 <span class="zkp-badge">ZKP</span></h1>
+            <p>区块链电子投票系统 - Sepolia 测试网 (零知识证明版)</p>
         </div>
 
         <div class="connection-status">
@@ -102,7 +104,7 @@
                 <div class="label">管理员账户</div>
                 <div class="value" id="adminAddress">未连接</div>
             </div>
-            <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()" style="width: auto;">🦊 连接钱包</button>
+            <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()" style="width: auto;">连接钱包</button>
         </div>
 
         <div class="grid">
@@ -115,8 +117,8 @@
                     <div class="status-item"><div class="status-label">已投票数</div><div class="status-value" id="voteCount">-</div></div>
                 </div>
                 <div style="margin-top: 20px;">
-                    <button class="btn btn-success" id="startBtn" onclick="startElection()" disabled>▶️ 启动选举</button>
-                    <button class="btn btn-danger" id="endBtn" onclick="endElection()" disabled>⏹️ 结束选举</button>
+                    <button class="btn btn-success" id="startBtn" onclick="startElection()" disabled>启动选举</button>
+                    <button class="btn btn-danger" id="endBtn" onclick="endElection()" disabled>结束选举</button>
                 </div>
             </div>
 
@@ -126,7 +128,7 @@
                     <label>选民地址</label>
                     <input type="text" id="voterAddress" placeholder="0x..." />
                 </div>
-                <button class="btn btn-primary" id="registerBtn" onclick="registerVoter()" disabled>➕ 注册选民</button>
+                <button class="btn btn-primary" id="registerBtn" onclick="registerVoter()" disabled>注册选民</button>
             </div>
 
             <div class="card">
@@ -135,15 +137,28 @@
                     <label>候选人姓名</label>
                     <input type="text" id="candidateName" placeholder="输入候选人姓名" />
                 </div>
-                <button class="btn btn-primary" id="addCandidateBtn" onclick="addCandidate()" disabled>➕ 添加候选人</button>
+                <button class="btn btn-primary" id="addCandidateBtn" onclick="addCandidate()" disabled>添加候选人</button>
                 <div id="candidateList" style="margin-top: 15px;"></div>
             </div>
 
             <div class="card">
-                <div class="card-title"><span class="icon">📝</span>计票管理</div>
-                <div class="alert alert-info">计票流程：结束选举 → 链下同态计票 → 上传结果</div>
-                <div id="tallyInputs"></div>
-                <button class="btn btn-warning" id="tallyBtn" onclick="submitTally()" disabled>📊 上传计票结果</button>
+                <div class="card-title"><span class="icon">🔐</span>ElGamal 密钥管理</div>
+                <div class="alert alert-info">管理员需要输入 ElGamal 私钥用于解密投票结果</div>
+                <div class="input-group">
+                    <label>ElGamal 私钥 (sk)</label>
+                    <input type="password" id="adminSK" placeholder="输入 ElGamal 私钥 (BigInt)" />
+                </div>
+                <button class="btn btn-primary" onclick="loadAdminKey()">加载密钥</button>
+                <div id="keyStatus" style="margin-top: 10px; font-size: 12px; color: #888;"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">📝</span>ZKP 计票管理</div>
+                <div class="alert alert-info">
+                    计票流程: 结束选举 -> 读取加密选票 -> 同态聚合 -> 解密 -> 生成 ZKP3 证明 -> 上传结果
+                </div>
+                <button class="btn btn-warning" id="tallyBtn" onclick="submitTallyWithZKP()" disabled>同态计票 + 生成 ZKP3 证明</button>
+                <div id="tallyResults" style="margin-top: 15px;"></div>
             </div>
 
             <div class="card" style="grid-column: 1 / -1;">
@@ -155,8 +170,12 @@
         </div>
     </div>
 
+    <!-- Dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.9.0/ethers.umd.min.js"></script>
+    <script src="https://unpkg.com/snarkjs@0.7.3/build/snarkjs.min.js"></script>
+    <script src="https://unpkg.com/circomlibjs@0.1.7/build/circomlibjs.umd.js"></script>
     <script src="config.js"></script>
+    <script src="lib/elgamal.js"></script>
     <script>
         const VOTING_ADDRESS = CONTRACT_CONFIG.VOTING_ADDRESS;
         const VOTER_REGISTRY_ADDRESS = CONTRACT_CONFIG.VOTER_REGISTRY_ADDRESS;
@@ -167,8 +186,10 @@
             "function addCandidate(string)",
             "function startElection()",
             "function endElection()",
-            "function updateTallyResults(uint256[], bytes32)",
-            "function admin() view returns (address)"
+            "function updateTallyResults(uint256[], bytes32, uint256[2], uint256[2][2], uint256[2], uint256[21])",
+            "function admin() view returns (address)",
+            "function getElgamalPK() view returns (uint256[2])",
+            "event EncryptedVoteCast(address indexed voter, bytes32 commitment, uint256[] encryptedVote)"
         ];
 
         const VOTER_REGISTRY_ABI = [
@@ -181,6 +202,9 @@
 
         let provider, signer, votingContract, voterRegistryContract, currentAccount;
         let candidates = [];
+        let elgamal = null;
+        let adminSK = null;
+        let adminPK = null;
         const STATUS_NAMES = ["已创建", "进行中", "已结束", "已计票"];
 
         function addLog(message, type = 'info') {
@@ -193,9 +217,30 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        function loadAdminKey() {
+            const skInput = document.getElementById('adminSK').value.trim();
+            if (!skInput) {
+                addLog('请输入 ElGamal 私钥', 'warning');
+                return;
+            }
+            try {
+                adminSK = BigInt(skInput);
+                const G = elgamal.getGenerator();
+                const derivedPK = elgamal.scalarMul(adminSK, G);
+                document.getElementById('keyStatus').textContent =
+                    `密钥已加载 (PK.x: ${elgamal.fromF(derivedPK[0]).toString().slice(0, 20)}...)`;
+                document.getElementById('keyStatus').style.color = '#4ade80';
+                addLog('ElGamal 私钥已加载', 'success');
+            } catch (e) {
+                addLog(`密钥加载失败: ${e.message}`, 'error');
+                document.getElementById('keyStatus').textContent = '密钥格式错误';
+                document.getElementById('keyStatus').style.color = '#f87171';
+            }
+        }
+
         async function connectWallet() {
             if (typeof window.ethereum === 'undefined') {
-                addLog('请安装 MetaMask！访问 https://metamask.io 下载', 'error');
+                addLog('请安装 MetaMask！', 'error');
                 return;
             }
 
@@ -212,7 +257,6 @@
                         await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xaa36a7' }] });
                     } catch (switchError) {
                         if (switchError.code === 4902) {
-                            addLog('正在添加 Sepolia 测试网...', 'info');
                             await window.ethereum.request({
                                 method: 'wallet_addEthereumChain',
                                 params: [{
@@ -223,9 +267,7 @@
                                     blockExplorerUrls: ['https://sepolia.etherscan.io']
                                 }]
                             });
-                        } else {
-                            throw switchError;
-                        }
+                        } else { throw switchError; }
                     }
                     provider = new ethers.BrowserProvider(window.ethereum);
                 }
@@ -236,13 +278,23 @@
 
                 const votingAdmin = await votingContract.admin();
                 if (votingAdmin.toLowerCase() !== currentAccount.toLowerCase()) {
-                    addLog('⚠️ 当前账户不是管理员！', 'warning');
+                    addLog('当前账户不是管理员！', 'warning');
                     addLog(`管理员地址: ${votingAdmin}`, 'info');
+                }
+
+                // Load ElGamal public key
+                try {
+                    const pk = await votingContract.getElgamalPK();
+                    adminPK = elgamal.pkFromBigInts(pk[0].toString(), pk[1].toString());
+                    addLog('已加载 ElGamal 公钥', 'success');
+                } catch (e) {
+                    adminPK = elgamal.pkFromBigInts(CONTRACT_CONFIG.ELGAMAL_PK.x, CONTRACT_CONFIG.ELGAMAL_PK.y);
+                    addLog('使用配置中的 ElGamal 公钥', 'info');
                 }
 
                 document.getElementById('connectionDot').classList.add('connected');
                 document.getElementById('adminAddress').textContent = currentAccount;
-                document.getElementById('connectBtn').textContent = '✅ 已连接';
+                document.getElementById('connectBtn').textContent = '已连接';
                 document.getElementById('connectBtn').disabled = true;
 
                 addLog(`已连接: ${currentAccount.slice(0, 10)}...`, 'success');
@@ -283,19 +335,14 @@
                 candidates = [];
                 const candidateList = document.getElementById('candidateList');
                 candidateList.innerHTML = '';
-                const tallyInputs = document.getElementById('tallyInputs');
-                tallyInputs.innerHTML = '';
 
                 for (let i = 0; i < candidateCount; i++) {
                     const candidate = await votingContract.getCandidate(i);
                     candidates.push({ id: i, name: candidate[0], votes: Number(candidate[1]) });
-
                     candidateList.innerHTML += `<div class="candidate-item"><span class="name">${candidate[0]}</span><span class="votes">${candidate[1]} 票</span></div>`;
-                    tallyInputs.innerHTML += `<div class="tally-input"><label>${candidate[0]} 得票数:</label><input type="number" id="tally-${i}" value="0" min="0" /></div>`;
                 }
 
                 addLog('选举信息已加载', 'success');
-
             } catch (error) {
                 addLog(`加载失败: ${error.message}`, 'error');
             }
@@ -317,26 +364,25 @@
                 if (isRegistered) {
                     addLog('该地址已注册', 'warning');
                     btn.disabled = false;
-                    btn.innerHTML = '➕ 注册选民';
+                    btn.innerHTML = '注册选民';
                     return;
                 }
 
                 addLog(`正在注册选民: ${address.slice(0, 10)}...`, 'info');
-                addLog('⚠️ 请在 MetaMask 中确认交易（如未弹窗，点击浏览器工具栏的 MetaMask 图标）', 'warning');
                 const tx = await voterRegistryContract.registerVoter(address);
-                addLog('⏳ 等待交易确认...', 'info');
+                addLog('等待交易确认...', 'info');
                 await tx.wait();
-                addLog(`✅ 选民注册成功！`, 'success');
+                addLog('选民注册成功！', 'success');
 
                 document.getElementById('voterAddress').value = '';
                 await loadElectionInfo();
                 btn.disabled = false;
-                btn.innerHTML = '➕ 注册选民';
+                btn.innerHTML = '注册选民';
 
             } catch (error) {
                 addLog(`注册失败: ${error.message}`, 'error');
                 document.getElementById('registerBtn').disabled = false;
-                document.getElementById('registerBtn').innerHTML = '➕ 注册选民';
+                document.getElementById('registerBtn').innerHTML = '注册选民';
             }
         }
 
@@ -353,21 +399,20 @@
                 btn.innerHTML = '<span class="loading"></span> 添加中...';
 
                 addLog(`正在添加候选人: ${name}`, 'info');
-                addLog('⚠️ 请在 MetaMask 中确认交易', 'warning');
                 const tx = await votingContract.addCandidate(name);
-                addLog('⏳ 等待交易确认...', 'info');
+                addLog('等待交易确认...', 'info');
                 await tx.wait();
-                addLog(`✅ 候选人添加成功！`, 'success');
+                addLog('候选人添加成功！', 'success');
 
                 document.getElementById('candidateName').value = '';
                 await loadElectionInfo();
                 btn.disabled = false;
-                btn.innerHTML = '➕ 添加候选人';
+                btn.innerHTML = '添加候选人';
 
             } catch (error) {
                 addLog(`添加失败: ${error.message}`, 'error');
                 document.getElementById('addCandidateBtn').disabled = false;
-                document.getElementById('addCandidateBtn').innerHTML = '➕ 添加候选人';
+                document.getElementById('addCandidateBtn').innerHTML = '添加候选人';
             }
         }
 
@@ -378,17 +423,16 @@
                 btn.innerHTML = '<span class="loading"></span> 启动中...';
 
                 addLog('正在启动选举...', 'info');
-                addLog('⚠️ 请在 MetaMask 中确认交易', 'warning');
                 const tx = await votingContract.startElection();
-                addLog('⏳ 等待交易确认...', 'info');
+                addLog('等待交易确认...', 'info');
                 await tx.wait();
-                addLog(`✅ 选举已启动！`, 'success');
+                addLog('选举已启动！', 'success');
                 await loadElectionInfo();
 
             } catch (error) {
                 addLog(`启动失败: ${error.message}`, 'error');
                 document.getElementById('startBtn').disabled = false;
-                document.getElementById('startBtn').innerHTML = '▶️ 启动选举';
+                document.getElementById('startBtn').innerHTML = '启动选举';
             }
         }
 
@@ -401,65 +445,142 @@
                 btn.innerHTML = '<span class="loading"></span> 结束中...';
 
                 addLog('正在结束选举...', 'info');
-                addLog('⚠️ 请在 MetaMask 中确认交易', 'warning');
                 const tx = await votingContract.endElection();
-                addLog('⏳ 等待交易确认...', 'info');
+                addLog('等待交易确认...', 'info');
                 await tx.wait();
-                addLog(`✅ 选举已结束！`, 'success');
+                addLog('选举已结束！', 'success');
                 await loadElectionInfo();
 
             } catch (error) {
                 addLog(`结束失败: ${error.message}`, 'error');
                 document.getElementById('endBtn').disabled = false;
-                document.getElementById('endBtn').innerHTML = '⏹️ 结束选举';
+                document.getElementById('endBtn').innerHTML = '结束选举';
             }
         }
 
-        async function submitTally() {
+        async function submitTallyWithZKP() {
+            if (!adminSK) {
+                addLog('请先加载 ElGamal 私钥', 'error');
+                return;
+            }
+
             try {
-                const results = [];
-                let total = 0;
+                const btn = document.getElementById('tallyBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span> 读取加密选票...';
+                const numCandidates = candidates.length;
 
-                for (let i = 0; i < candidates.length; i++) {
-                    const votes = parseInt(document.getElementById(`tally-${i}`).value) || 0;
-                    results.push(votes);
-                    total += votes;
-                }
+                // 1. Read all encrypted votes from event logs
+                addLog('正在读取链上加密选票事件...', 'info');
+                const filter = votingContract.filters.EncryptedVoteCast();
+                const events = await votingContract.queryFilter(filter);
+                addLog(`找到 ${events.length} 张加密选票`, 'info');
 
-                const info = await votingContract.getElectionInfo();
-                const expectedTotal = Number(info[4]);
-
-                if (total !== expectedTotal) {
-                    addLog(`票数不匹配！输入: ${total}, 期望: ${expectedTotal}`, 'error');
+                if (events.length === 0) {
+                    addLog('没有投票记录', 'warning');
+                    btn.disabled = false;
+                    btn.innerHTML = '同态计票 + 生成 ZKP3 证明';
                     return;
                 }
 
-                const btn = document.getElementById('tallyBtn');
-                btn.disabled = true;
-                btn.innerHTML = '<span class="loading"></span> 上传中...';
+                // 2. Parse encrypted votes and perform homomorphic aggregation
+                addLog('正在执行同态聚合...', 'info');
+                btn.innerHTML = '<span class="loading"></span> 同态聚合中...';
 
+                const allVotes = events.map(event => {
+                    const encData = event.args.encryptedVote;
+                    return elgamal.uint256ArrayToCiphertexts(
+                        encData.map(x => BigInt(x.toString())),
+                        numCandidates
+                    );
+                });
+
+                const aggregated = elgamal.aggregateVotes(allVotes, numCandidates);
+                addLog('同态聚合完成', 'success');
+
+                // 3. Decrypt aggregated ciphertexts
+                addLog('正在解密投票结果...', 'info');
+                btn.innerHTML = '<span class="loading"></span> 解密中...';
+
+                const results = [];
+                const resultPoints = [];
+                for (let j = 0; j < numCandidates; j++) {
+                    const mG = elgamal.decryptToPoint(aggregated[j], adminSK);
+                    resultPoints.push(mG);
+                    const count = elgamal.solveDLog(mG, events.length + 100);
+                    results.push(count);
+                    addLog(`${candidates[j].name}: ${count} 票`, 'info');
+                }
+
+                // Display results
+                const tallyResultsDiv = document.getElementById('tallyResults');
+                tallyResultsDiv.innerHTML = results.map((r, i) =>
+                    `<div class="candidate-item"><span class="name">${candidates[i].name}</span><span class="votes">${r} 票</span></div>`
+                ).join('');
+
+                // 4. Generate ZKP3 tally proof
+                addLog('正在生成 ZKP3 计票证明 (Groth16)...', 'info');
+                btn.innerHTML = '<span class="loading"></span> ZKP3 证明生成中...';
+
+                const G = elgamal.getGenerator();
+                const derivedPK = elgamal.scalarMul(adminSK, G);
+                const tallyWitness = elgamal.prepareTallyWitness(
+                    adminSK, derivedPK, aggregated, resultPoints, events.length
+                );
+
+                const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+                    tallyWitness,
+                    CONTRACT_CONFIG.ZKP.TALLY_PROOF_WASM,
+                    CONTRACT_CONFIG.ZKP.TALLY_PROOF_ZKEY
+                );
+                addLog('ZKP3 证明生成成功!', 'success');
+
+                // 5. Convert proof to Solidity calldata
+                const calldataStr = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
+                const calldata = JSON.parse(`[${calldataStr}]`);
+
+                const pA = calldata[0];
+                const pB = calldata[1];
+                const pC = calldata[2];
+                const pubSignals21 = calldata[3]; // 21 public signals
+
+                // 6. Compute merkle root
                 const merkleRoot = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(results)));
 
-                addLog(`正在上传计票结果: [${results.join(', ')}]`, 'info');
-                addLog('⚠️ 请在 MetaMask 中确认交易', 'warning');
-                const tx = await votingContract.updateTallyResults(results, merkleRoot);
-                addLog('⏳ 等待交易确认...', 'info');
+                // 7. Submit to contract
+                addLog('正在提交计票结果 (含 ZKP3 证明)...', 'info');
+                btn.innerHTML = '<span class="loading"></span> 提交中...';
+
+                const tx = await votingContract.updateTallyResults(
+                    results, merkleRoot, pA, pB, pC, pubSignals21
+                );
+                addLog('交易已发送，等待确认...', 'info');
                 await tx.wait();
-                addLog(`✅ 计票结果已上传！`, 'success');
+
+                addLog('计票结果已上传并通过 ZKP 验证!', 'success');
                 await loadElectionInfo();
 
             } catch (error) {
-                addLog(`上传失败: ${error.message}`, 'error');
+                addLog(`计票失败: ${error.message}`, 'error');
+                console.error('Tally error:', error);
                 document.getElementById('tallyBtn').disabled = false;
-                document.getElementById('tallyBtn').innerHTML = '📊 上传计票结果';
+                document.getElementById('tallyBtn').innerHTML = '同态计票 + 生成 ZKP3 证明';
             }
         }
 
         window.addEventListener('load', async () => {
-            addLog('管理员控制台已加载', 'info');
+            addLog('管理员控制台已加载 (ZKP 版本)', 'info');
+
+            // Initialize ElGamal library
+            try {
+                elgamal = await ElGamalLib.init();
+                addLog('ZKP 库初始化成功', 'success');
+            } catch (e) {
+                addLog(`ZKP 库初始化失败: ${e.message}`, 'error');
+            }
+
             if (typeof window.ethereum !== 'undefined') {
                 addLog('检测到 MetaMask', 'info');
-                // 自动连接已授权的账户
                 const accounts = await window.ethereum.request({ method: 'eth_accounts' });
                 if (accounts.length > 0) {
                     addLog('发现已授权账户，自动连接...', 'info');

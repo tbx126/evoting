@@ -55,3 +55,11 @@ deployments/localhost/
 gas-report.txt
 coverage/
 coverage.json
+
+# ============ ZKP Build Artifacts ============
+# Large binary files (WASM/zkey) - rebuild with scripts/setup-zkp.sh
+*.wasm
+*.zkey
+*.ptau
+*.r1cs
+*.sym

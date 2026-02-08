@@ -11,11 +11,36 @@ interface IVoterRegistry {
 }
 
 /**
- * @title Voting - 单一选举投票合约（同态加密版本）
- * @notice 管理单场选举的投票提交和结果统计
- * @dev 支持 Paillier 同态加密投票，链下计票后上传结果
+ * @title IVoteVerifier - ZKP 投票证明验证器接口
+ */
+interface IVoteVerifier {
+    function verifyProof(
+        uint[2] calldata _pA,
+        uint[2][2] calldata _pB,
+        uint[2] calldata _pC,
+        uint[4] calldata _pubSignals
+    ) external view returns (bool);
+}
+
+/**
+ * @title ITallyVerifier - ZKP 计票证明验证器接口
+ */
+interface ITallyVerifier {
+    function verifyProof(
+        uint[2] calldata _pA,
+        uint[2][2] calldata _pB,
+        uint[2] calldata _pC,
+        uint[21] calldata _pubSignals
+    ) external view returns (bool);
+}
+
+/**
+ * @title Voting - ZKP 零知识证明投票合约
+ * @notice 管理单场选举：投票提交（含 ZKP 证明）和结果统计（含计票证明）
+ * @dev 使用 ElGamal on BabyJubJub 同态加密 + Groth16 零知识证明
+ *      - ZKP1+ZKP2: 选票合法性 + 承诺-密文一致性（投票时验证）
+ *      - ZKP3: 解密正确性（计票时验证）
  *      选举由管理员手动开启和关闭，无时间限制
- *      移除了 revealVote 机制，改用 updateTallyResults 上传计票结果
  */
 contract Voting {
     // ============ 状态变量 ============
@@ -25,6 +50,12 @@ contract Voting {
 
     /// @notice 选民注册合约地址
     address public voterRegistry;
+
+    /// @notice ZKP 投票验证器合约
+    address public voteVerifier;
+
+    /// @notice ZKP 计票验证器合约
+    address public tallyVerifier;
 
     /// @notice 选举状态枚举
     enum ElectionStatus {
@@ -52,6 +83,9 @@ contract Voting {
     /// @notice Merkle 根哈希
     bytes32 public merkleRoot;
 
+    /// @notice ElGamal 公钥 (BabyJubJub 点)
+    uint256[2] public elgamalPK;
+
     /// @notice 候选人结构体
     struct Candidate {
         uint256 id;         // 候选人ID
@@ -61,9 +95,10 @@ contract Voting {
 
     /// @notice 投票记录结构体
     struct VoteRecord {
-        bytes32 commitment;     // 加密投票的承诺哈希
-        uint256 timestamp;      // 投票时间
-        bool counted;           // 是否已计入结果
+        bytes32 commitment;       // Poseidon(candidateId, salt) 承诺
+        bytes32 ciphertextHash;   // Poseidon(所有密文分量) 绑定哈希
+        uint256 timestamp;        // 投票时间
+        bool counted;             // 是否已计入结果
     }
 
     // ============ 映射 ============
@@ -81,7 +116,8 @@ contract Voting {
 
     event ElectionInitialized(string title);
     event CandidateAdded(uint256 indexed candidateId, string name);
-    event VoteCast(address indexed voter, bytes32 commitment);
+    event VoteCast(address indexed voter, bytes32 commitment, bytes32 ciphertextHash);
+    event EncryptedVoteCast(address indexed voter, bytes32 commitment, uint256[] encryptedVote);
     event TallyCompleted(uint256[] results, bytes32 merkleRoot);
     event ElectionStatusChanged(ElectionStatus newStatus);
     event MerkleRootUpdated(bytes32 root);
@@ -110,16 +146,27 @@ contract Voting {
      * @param _voterRegistry 选民注册合约地址
      * @param _title 选举标题
      * @param _description 选举描述
+     * @param _voteVerifier ZKP 投票验证器合约地址
+     * @param _tallyVerifier ZKP 计票验证器合约地址
+     * @param _elgamalPK ElGamal 公钥 [pkX, pkY] (BabyJubJub 点)
      */
     constructor(
         address _voterRegistry,
         string memory _title,
-        string memory _description
+        string memory _description,
+        address _voteVerifier,
+        address _tallyVerifier,
+        uint256[2] memory _elgamalPK
     ) {
         require(_voterRegistry != address(0), "Voting: invalid registry");
+        require(_voteVerifier != address(0), "Voting: invalid vote verifier");
+        require(_tallyVerifier != address(0), "Voting: invalid tally verifier");
 
         admin = msg.sender;
         voterRegistry = _voterRegistry;
+        voteVerifier = _voteVerifier;
+        tallyVerifier = _tallyVerifier;
+        elgamalPK = _elgamalPK;
         title = _title;
         description = _description;
         status = ElectionStatus.Created;
@@ -165,11 +212,23 @@ contract Voting {
     // ============ 投票函数 ============
 
     /**
-     * @notice 提交投票承诺
-     * @param _commitment 加密投票的承诺哈希 = SHA256(encrypted_vote)
+     * @notice 提交投票（含 ZKP 证明）
+     * @param _commitment Poseidon(candidateId, salt) 承诺哈希
+     * @param _ciphertextHash Poseidon(所有密文分量) 绑定哈希
+     * @param _pA Groth16 proof point A
+     * @param _pB Groth16 proof point B
+     * @param _pC Groth16 proof point C
+     * @param _encryptedVote 加密投票数据 (emit 到事件日志, 用于链下同态计票)
      */
-    function castVote(bytes32 _commitment) external electionActive {
-        // 检查选民资格
+    function castVote(
+        bytes32 _commitment,
+        bytes32 _ciphertextHash,
+        uint[2] calldata _pA,
+        uint[2][2] calldata _pB,
+        uint[2] calldata _pC,
+        uint256[] calldata _encryptedVote
+    ) external electionActive {
+        // 1. 检查选民资格
         IVoterRegistry registry = IVoterRegistry(voterRegistry);
         require(registry.isRegistered(msg.sender), "Voting: not registered");
         require(!registry.hasVoted(msg.sender), "Voting: already voted");
@@ -177,12 +236,25 @@ contract Voting {
         require(_commitment != bytes32(0), "Voting: invalid commitment");
         require(voteRecords[msg.sender].commitment == bytes32(0), "Voting: duplicate vote");
 
-        // 标记已投票
+        // 2. 验证 ZKP 证明 (ZKP1 + ZKP2)
+        uint[4] memory pubSignals;
+        pubSignals[0] = uint256(_commitment);
+        pubSignals[1] = uint256(_ciphertextHash);
+        pubSignals[2] = elgamalPK[0];
+        pubSignals[3] = elgamalPK[1];
+
+        require(
+            IVoteVerifier(voteVerifier).verifyProof(_pA, _pB, _pC, pubSignals),
+            "Voting: invalid ZKP proof"
+        );
+
+        // 3. 标记已投票
         registry.markAsVoted(msg.sender);
 
-        // 记录投票
+        // 4. 记录投票
         voteRecords[msg.sender] = VoteRecord({
             commitment: _commitment,
+            ciphertextHash: _ciphertextHash,
             timestamp: block.timestamp,
             counted: false
         });
@@ -190,20 +262,44 @@ contract Voting {
         commitments.push(_commitment);
         totalVotes++;
 
-        emit VoteCast(msg.sender, _commitment);
+        // 5. 发出事件 (密文数据存储在事件日志中，不在存储中)
+        emit VoteCast(msg.sender, _commitment, _ciphertextHash);
+        emit EncryptedVoteCast(msg.sender, _commitment, _encryptedVote);
     }
 
     /**
-     * @notice 更新计票结果（管理员调用，链下同态计票后上传）
+     * @notice 更新计票结果（管理员调用，含 ZKP3 计票正确性证明）
      * @param _results 每个候选人的得票数数组
      * @param _merkleRoot 投票的 Merkle 根哈希
+     * @param _pA Groth16 proof point A (ZKP3)
+     * @param _pB Groth16 proof point B (ZKP3)
+     * @param _pC Groth16 proof point C (ZKP3)
+     * @param _tallyPubSignals ZKP3 公开输入 (21 个 uint256)
      */
     function updateTallyResults(
         uint256[] calldata _results,
-        bytes32 _merkleRoot
+        bytes32 _merkleRoot,
+        uint[2] calldata _pA,
+        uint[2][2] calldata _pB,
+        uint[2] calldata _pC,
+        uint[21] calldata _tallyPubSignals
     ) external onlyAdmin inStatus(ElectionStatus.Ended) {
         require(_results.length == candidateCount, "Voting: invalid results length");
 
+        // 1. 验证公开输入中的 PK 与合约存储的一致 (先于证明验证, 节省 gas)
+        require(_tallyPubSignals[0] == elgamalPK[0], "Voting: PK mismatch X");
+        require(_tallyPubSignals[1] == elgamalPK[1], "Voting: PK mismatch Y");
+
+        // 2. 验证总票数 (公开输入最后一个是 totalVotes)
+        require(_tallyPubSignals[20] == totalVotes, "Voting: total votes mismatch");
+
+        // 3. 验证 ZKP3 证明 (解密正确性)
+        require(
+            ITallyVerifier(tallyVerifier).verifyProof(_pA, _pB, _pC, _tallyPubSignals),
+            "Voting: invalid tally ZKP proof"
+        );
+
+        // 4. 更新候选人得票数
         uint256 totalVotesSum = 0;
         for (uint256 i = 0; i < candidateCount; i++) {
             candidates[i].voteCount = _results[i];
@@ -212,6 +308,7 @@ contract Voting {
 
         require(totalVotesSum == totalVotes, "Voting: vote count mismatch");
 
+        // 5. 更新状态
         merkleRoot = _merkleRoot;
         status = ElectionStatus.Tallied;
 
@@ -244,6 +341,13 @@ contract Voting {
     }
 
     /**
+     * @notice 获取 ElGamal 公钥
+     */
+    function getElgamalPK() external view returns (uint256[2] memory) {
+        return elgamalPK;
+    }
+
+    /**
      * @notice 获取候选人信息
      * @param _candidateId 候选人ID
      */
@@ -262,11 +366,12 @@ contract Voting {
      */
     function getVoteRecord(address _voter) external view returns (
         bytes32 commitment,
+        bytes32 ciphertextHash,
         uint256 timestamp,
         bool counted
     ) {
         VoteRecord storage r = voteRecords[_voter];
-        return (r.commitment, r.timestamp, r.counted);
+        return (r.commitment, r.ciphertextHash, r.timestamp, r.counted);
     }
 
     /**

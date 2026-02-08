@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
@@ -43,3 +44,8 @@ async def admin_page():
 async def config_js():
     """合约配置文件（由 deploy.js 生成）"""
     return FileResponse(FRONTEND_DIR / "config.js", media_type="application/javascript")
+
+
+# 静态文件: ElGamal JS 库 + ZKP 资源 (WASM, zkey)
+app.mount("/lib", StaticFiles(directory=FRONTEND_DIR / "lib"), name="lib")
+app.mount("/zk", StaticFiles(directory=FRONTEND_DIR / "zk"), name="zk")
