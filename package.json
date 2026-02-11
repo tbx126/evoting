@@ -9,7 +9,8 @@
     "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
     "node": "hardhat node",
     "demo": "hardhat run scripts/deploy-local.js --network localhost",
-    "server": "python -m uvicorn server:app --port 8000"
+    "server": "python -m uvicorn server:app --port 8000",
+    "build:frontend": "npx browserify frontend/lib/circomlibjs-entry.js --standalone circomlibjs -o frontend/lib/circomlibjs.bundle.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
