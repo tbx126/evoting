@@ -100,7 +100,7 @@
     <div class="container">
         <div class="card">
             <h1>区块链电子投票系统 <span class="zkp-badge">ZKP</span></h1>
-            <h2>2026 年度最佳员工评选 - Sepolia 测试网 (零知识证明版)</h2>
+            <h2 id="electionSubtitle">零知识证明投票系统</h2>
             <div class="status-bar">
                 <div class="status-item">
                     <div class="status-label">钱包状态</div>
@@ -135,6 +135,11 @@
             <button class="btn btn-primary" id="voteBtn" onclick="submitVote()" disabled>提交投票 (ZKP)</button>
         </div>
 
+        <div class="card" id="resultsCard" style="display: none;">
+            <div class="section-title">选举结果</div>
+            <div id="resultsContainer"></div>
+        </div>
+
         <div class="card">
             <div class="section-title">操作日志</div>
             <div class="log-container" id="logContainer">
@@ -145,7 +150,7 @@
         <div class="card">
             <div class="section-title">合约信息</div>
             <p><strong>Voting:</strong> <a class="tx-link" id="contractLink" href="#" target="_blank"></a></p>
-            <p><strong>网络:</strong> Sepolia (Chain ID: 11155111)</p>
+            <p><strong>网络:</strong> <span id="networkInfo"></span></p>
             <p><strong>ZKP:</strong> Groth16 on BN254 + ElGamal on BabyJubJub</p>
         </div>
     </div>
@@ -217,23 +222,24 @@
                 addLog(`已连接: ${currentAccount.slice(0, 10)}...`, 'success');
 
                 const network = await provider.getNetwork();
-                if (network.chainId !== 11155111n) {
-                    addLog('请切换到 Sepolia 测试网！', 'warning');
+                const expectedChainId = BigInt(CONTRACT_CONFIG.NETWORK.chainId);
+                if (network.chainId !== expectedChainId) {
+                    addLog(`请切换到 ${CONTRACT_CONFIG.NETWORK.name} 网络！`, 'warning');
                     try {
                         await window.ethereum.request({
                             method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: '0xaa36a7' }]
+                            params: [{ chainId: CONTRACT_CONFIG.NETWORK.chainIdHex }]
                         });
                     } catch (switchError) {
                         if (switchError.code === 4902) {
                             await window.ethereum.request({
                                 method: 'wallet_addEthereumChain',
                                 params: [{
-                                    chainId: '0xaa36a7',
-                                    chainName: 'Sepolia Testnet',
-                                    nativeCurrency: { name: 'SepoliaETH', symbol: 'ETH', decimals: 18 },
-                                    rpcUrls: ['https://rpc.sepolia.org'],
-                                    blockExplorerUrls: ['https://sepolia.etherscan.io']
+                                    chainId: CONTRACT_CONFIG.NETWORK.chainIdHex,
+                                    chainName: CONTRACT_CONFIG.NETWORK.name,
+                                    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                                    rpcUrls: [CONTRACT_CONFIG.NETWORK.rpcUrl || 'https://rpc.sepolia.org'],
+                                    blockExplorerUrls: [CONTRACT_CONFIG.NETWORK.explorerUrl || 'https://sepolia.etherscan.io']
                                 }]
                             });
                         } else {
@@ -284,9 +290,14 @@
                 addLog('正在加载选举信息...', 'info');
 
                 const info = await votingContract.getElectionInfo();
+                const electionTitle = info[0];
+                const electionDesc = info[1];
                 const status = Number(info[2]);
                 const candidateCount = Number(info[3]);
                 const totalVotes = Number(info[4]);
+
+                document.getElementById('electionSubtitle').textContent =
+                    `${electionTitle} - ${CONTRACT_CONFIG.NETWORK.name}`;
 
                 document.getElementById('electionStatus').textContent = STATUS_NAMES[status];
                 document.getElementById('totalVotes').textContent = totalVotes;
@@ -323,8 +334,21 @@
 
                 if (status === 1 && isRegistered && !hasVoted) {
                     document.getElementById('votingCard').style.display = 'block';
+                    document.getElementById('resultsCard').style.display = 'none';
                     addLog('选举进行中，请选择候选人投票', 'success');
-                } else if (status !== 1) {
+                } else if (status === 3) {
+                    // 已计票 - 显示结果
+                    document.getElementById('votingCard').style.display = 'none';
+                    document.getElementById('resultsCard').style.display = 'block';
+                    const resultsHtml = candidates.map(c =>
+                        `<div style="display:flex;justify-content:space-between;align-items:center;padding:15px 20px;background:#f8f9fa;border-radius:10px;margin-bottom:10px;">
+                            <span style="font-size:18px;font-weight:bold;">${c.name}</span>
+                            <span style="font-size:24px;font-weight:bold;color:#667eea;">${c.votes} 票</span>
+                        </div>`
+                    ).join('');
+                    document.getElementById('resultsContainer').innerHTML = resultsHtml;
+                    addLog('选举已计票，结果已公布', 'success');
+                } else {
                     addLog(`选举状态: ${STATUS_NAMES[status]}`, 'warning');
                 }
 
@@ -414,7 +438,9 @@
                 await tx.wait();
 
                 addLog('投票成功! (含零知识证明)', 'success');
-                addLog(`<a class="tx-link" href="https://sepolia.etherscan.io/tx/${tx.hash}" target="_blank">查看交易</a>`, 'success');
+                if (CONTRACT_CONFIG.NETWORK.explorerUrl) {
+                    addLog(`<a class="tx-link" href="${CONTRACT_CONFIG.NETWORK.explorerUrl}/tx/${tx.hash}" target="_blank">查看交易</a>`, 'success');
+                }
 
                 // Save salt to localStorage for later verification
                 const voteReceipt = {
@@ -440,8 +466,15 @@
 
         window.addEventListener('load', async () => {
             const link = document.getElementById('contractLink');
-            link.href = `https://sepolia.etherscan.io/address/${VOTING_ADDRESS}`;
+            const explorerUrl = CONTRACT_CONFIG.NETWORK.explorerUrl;
+            if (explorerUrl) {
+                link.href = `${explorerUrl}/address/${VOTING_ADDRESS}`;
+            } else {
+                link.href = '#';
+            }
             link.textContent = VOTING_ADDRESS.slice(0, 9) + '...' + VOTING_ADDRESS.slice(-8);
+            document.getElementById('networkInfo').textContent =
+                `${CONTRACT_CONFIG.NETWORK.name} (Chain ID: ${CONTRACT_CONFIG.NETWORK.chainId})`;
 
             // Initialize ZKP library
             await initZKP();

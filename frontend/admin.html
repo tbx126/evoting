@@ -95,7 +95,7 @@
     <div class="container">
         <div class="header">
             <h1>管理员控制台 <span class="zkp-badge">ZKP</span></h1>
-            <p>区块链电子投票系统 - Sepolia 测试网 (零知识证明版)</p>
+            <p id="adminSubtitle">区块链电子投票系统 - 零知识证明版</p>
         </div>
 
         <div class="connection-status">
@@ -251,20 +251,21 @@
                 currentAccount = accounts[0];
 
                 const network = await provider.getNetwork();
-                if (network.chainId !== 11155111n) {
-                    addLog('请切换到 Sepolia 测试网', 'warning');
+                const expectedChainId = BigInt(CONTRACT_CONFIG.NETWORK.chainId);
+                if (network.chainId !== expectedChainId) {
+                    addLog(`请切换到 ${CONTRACT_CONFIG.NETWORK.name} 网络`, 'warning');
                     try {
-                        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xaa36a7' }] });
+                        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CONTRACT_CONFIG.NETWORK.chainIdHex }] });
                     } catch (switchError) {
                         if (switchError.code === 4902) {
                             await window.ethereum.request({
                                 method: 'wallet_addEthereumChain',
                                 params: [{
-                                    chainId: '0xaa36a7',
-                                    chainName: 'Sepolia Testnet',
-                                    nativeCurrency: { name: 'SepoliaETH', symbol: 'ETH', decimals: 18 },
-                                    rpcUrls: ['https://rpc.sepolia.org'],
-                                    blockExplorerUrls: ['https://sepolia.etherscan.io']
+                                    chainId: CONTRACT_CONFIG.NETWORK.chainIdHex,
+                                    chainName: CONTRACT_CONFIG.NETWORK.name,
+                                    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                                    rpcUrls: [CONTRACT_CONFIG.NETWORK.rpcUrl || 'https://rpc.sepolia.org'],
+                                    blockExplorerUrls: [CONTRACT_CONFIG.NETWORK.explorerUrl || 'https://sepolia.etherscan.io']
                                 }]
                             });
                         } else { throw switchError; }
@@ -296,6 +297,15 @@
                 document.getElementById('adminAddress').textContent = currentAccount;
                 document.getElementById('connectBtn').textContent = '已连接';
                 document.getElementById('connectBtn').disabled = true;
+
+                document.getElementById('adminSubtitle').textContent =
+                    `区块链电子投票系统 - ${CONTRACT_CONFIG.NETWORK.name} (零知识证明版)`;
+
+                // 开发模式: 自动填充测试私钥
+                if (CONTRACT_CONFIG.DEV_ADMIN_SK) {
+                    document.getElementById('adminSK').value = CONTRACT_CONFIG.DEV_ADMIN_SK;
+                    addLog('检测到开发模式，已自动填充测试 ElGamal 私钥', 'warning');
+                }
 
                 addLog(`已连接: ${currentAccount.slice(0, 10)}...`, 'success');
                 await loadElectionInfo();

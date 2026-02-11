@@ -5,13 +5,5 @@
 fastapi==0.109.0
 uvicorn==0.27.0
 
-# 区块链交互
-web3==6.14.0
-eth-account==0.10.0
-
-# 密码学
-phe==1.5.0
-pycryptodome==3.20.0
-
-# 工具
-httpx==0.26.0
+# 测试
+pytest==8.0.0

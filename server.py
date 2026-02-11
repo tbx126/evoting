@@ -11,12 +11,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 
 app = FastAPI(
     title="区块链电子投票系统",
     description="基于以太坊的安全电子投票系统",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 app.add_middleware(
