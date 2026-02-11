@@ -41,7 +41,19 @@
       "Bash(bash:*)",
       "Bash(git -C C:/Users/tbx12/Desktop/ccgopus status)",
       "Bash(git -C C:/Users/tbx12/Desktop/ccgopus diff HEAD --stat)",
-      "Bash(git -C C:/Users/tbx12/Desktop/ccgopus log --oneline -5)"
+      "Bash(git -C C:/Users/tbx12/Desktop/ccgopus log --oneline -5)",
+      "Bash(git -C C:/Users/tbx12/Desktop/ccgopus push)",
+      "Bash(git rm:*)",
+      "Bash(node -e:*)",
+      "WebFetch(domain:unpkg.com)",
+      "WebFetch(domain:app.unpkg.com)",
+      "Bash(npx esbuild:*)",
+      "Bash(npx browserify:*)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"blockchain fintech dashboard admin voting security\" --design-system -p \"Blockchain E-Voting ZKP\" -f markdown)",
+      "Bash(python:*)",
+      "Bash(ls:*)",
+      "Bash(git checkout:*)",
+      "Bash(git -C C:/Users/tbx12/Desktop/ccgopus add frontend/admin.html frontend/voting-app.html .claude/settings.local.json)"
     ]
   }
 }

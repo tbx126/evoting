@@ -4,161 +4,596 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>区块链电子投票系统 (ZKP)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --color-primary: #0F172A;
+            --color-secondary: #1E293B;
+            --color-cta: #22C55E;
+            --color-background: #020617;
+            --color-text: #F8FAFC;
+            --color-muted: #94A3B8;
+            --color-border: rgba(255,255,255,0.08);
+            --color-surface: rgba(255,255,255,0.04);
+            --color-surface-hover: rgba(255,255,255,0.07);
+            --color-danger: #EF4444;
+            --color-warning: #F59E0B;
+            --color-info: #3B82F6;
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.3);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.3);
+        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Fira Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--color-background);
+            color: var(--color-text);
             min-height: 100vh;
+            line-height: 1.4;
+        }
+        /* --- Navbar --- */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 56px;
+            background: var(--color-primary);
+            border-bottom: 1px solid var(--color-border);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+        }
+        .nav-content {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Fira Code', monospace;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--color-text);
+        }
+        .nav-brand svg { flex-shrink: 0; }
+        .zkp-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: var(--color-cta);
+            color: #fff;
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .nav-link {
+            color: var(--color-muted);
+            text-decoration: none;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--color-border);
+            transition: all 200ms ease;
+            cursor: pointer;
+        }
+        .nav-link:hover {
+            color: var(--color-text);
+            border-color: rgba(255,255,255,0.2);
+            background: var(--color-surface);
+        }
+        .nav-connect-btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 8px;
+            background: var(--color-cta);
+            color: #fff;
+            font-family: 'Fira Sans', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 200ms ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .nav-connect-btn:hover { opacity: 0.9; }
+        .nav-connect-btn:disabled {
+            background: #334155;
+            color: #64748B;
+            cursor: not-allowed;
+        }
+        .nav-connect-btn.connected {
+            background: rgba(34,197,94,0.15);
+            color: var(--color-cta);
+            border: 1px solid rgba(34,197,94,0.3);
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+        }
+        /* --- Container --- */
+        .app-layout {
+            display: flex;
+            margin-top: 56px;
+            min-height: calc(100vh - 56px);
+        }
+        .container {
+            flex: 1;
+            min-width: 0;
+            padding: 16px 24px 24px;
+            overflow-y: auto;
+            max-height: calc(100vh - 56px);
+        }
+        .subtitle {
+            font-size: 13px;
+            color: var(--color-muted);
+            margin-bottom: 16px;
+        }
+        /* --- Stats Grid --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-card {
+            background: var(--color-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 12px 16px;
+            text-align: center;
+            transition: transform 200ms ease, box-shadow 200ms ease;
+        }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .stat-label {
+            font-size: 11px;
+            color: var(--color-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .stat-val {
+            font-family: 'Fira Code', monospace;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .stat-val.connected { color: var(--color-cta); }
+        .stat-val.active { color: var(--color-cta); }
+        .stat-val.warning { color: var(--color-warning); }
+        /* --- Alerts --- */
+        .alert {
+            padding: 10px 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .alert svg { flex-shrink: 0; }
+        .alert-warning {
+            background: rgba(245,158,11,0.1);
+            border: 1px solid rgba(245,158,11,0.25);
+            color: var(--color-warning);
+        }
+        .alert-success {
+            background: rgba(34,197,94,0.1);
+            border: 1px solid rgba(34,197,94,0.25);
+            color: var(--color-cta);
+        }
+        .alert-info {
+            background: rgba(59,130,246,0.1);
+            border: 1px solid rgba(59,130,246,0.25);
+            color: var(--color-info);
+        }
+        /* --- Section --- */
+        .section {
+            background: var(--color-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
             padding: 20px;
+            margin-bottom: 16px;
         }
-        .container { max-width: 800px; margin: 0 auto; }
-        .card {
-            background: white;
-            border-radius: 16px;
-            padding: 30px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        .section-title {
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--color-text);
         }
-        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
-        h2 { color: #555; margin-bottom: 20px; font-size: 18px; font-weight: normal; }
-        .status-bar {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 15px 20px; background: #f8f9fa; border-radius: 10px; margin-bottom: 20px;
-            flex-wrap: wrap; gap: 10px;
+        .section-title svg { color: var(--color-cta); }
+        /* --- Candidates Grid --- */
+        .candidates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
         }
-        .status-item { text-align: center; min-width: 80px; }
-        .status-label { font-size: 12px; color: #666; margin-bottom: 5px; }
-        .status-value { font-size: 16px; font-weight: bold; color: #333; }
-        .status-value.connected { color: #28a745; }
+        .cand-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: var(--color-surface);
+            border: 2px solid var(--color-border);
+            border-radius: 10px;
+            transition: all 200ms ease;
+            position: relative;
+            overflow: hidden;
+            cursor: default;
+        }
+        .cand-card.clickable { cursor: pointer; }
+        .cand-card.clickable:hover {
+            border-color: rgba(34,197,94,0.4);
+            background: var(--color-surface-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        .cand-card.selected {
+            border-color: var(--color-cta);
+            background: rgba(34,197,94,0.08);
+        }
+        .cand-card.selected::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--color-cta);
+        }
+        .cand-avatar {
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Fira Code', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .cand-info { flex: 1; min-width: 0; }
+        .cand-name {
+            font-weight: 600;
+            font-size: 16px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .cand-votes {
+            font-size: 13px;
+            color: var(--color-muted);
+            font-family: 'Fira Code', monospace;
+        }
+        .cand-check {
+            width: 28px; height: 28px;
+            border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 200ms ease;
+            flex-shrink: 0;
+        }
+        .cand-card.selected .cand-check {
+            background: var(--color-cta);
+            border-color: var(--color-cta);
+        }
+        /* --- Buttons --- */
         .btn {
-            padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px;
-            cursor: pointer; transition: all 0.3s; display: inline-flex;
-            align-items: center; gap: 8px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-family: 'Fira Sans', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 200ms ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        .btn-cta {
+            background: var(--color-cta);
+            color: #fff;
         }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
-        .btn-primary:disabled { background: #ccc; cursor: not-allowed; transform: none; }
-        .candidates { display: grid; gap: 15px; margin: 20px 0; }
-        .candidate-card {
-            display: flex; align-items: center; padding: 20px;
-            border: 2px solid #e9ecef; border-radius: 12px;
-            cursor: pointer; transition: all 0.3s;
+        .btn-cta:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-cta:disabled {
+            background: #334155;
+            color: #64748B;
+            cursor: not-allowed;
+            transform: none;
         }
-        .candidate-card:hover { border-color: #667eea; background: #f8f9ff; }
-        .candidate-card.selected {
-            border-color: #667eea;
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        .vote-action {
+            display: flex;
+            justify-content: center;
         }
-        .candidate-avatar {
-            width: 60px; height: 60px; border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 24px; font-weight: bold; margin-right: 20px;
+        .vote-action .btn { min-width: 240px; padding: 12px 28px; font-size: 15px; }
+        /* --- Results --- */
+        .results-grid {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            gap: 16px;
+            align-items: start;
         }
-        .candidate-info { flex: 1; }
-        .candidate-name { font-size: 20px; font-weight: bold; color: #333; }
-        .candidate-votes { font-size: 14px; color: #666; margin-top: 5px; }
-        .candidate-check {
-            width: 30px; height: 30px; border: 2px solid #ddd; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; transition: all 0.3s;
+        .result-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--color-border);
         }
-        .candidate-card.selected .candidate-check { background: #667eea; border-color: #667eea; color: white; }
-        .log-container {
-            background: #1e1e1e; border-radius: 10px; padding: 20px;
-            max-height: 300px; overflow-y: auto;
+        .result-item:last-child { border-bottom: none; }
+        .result-rank {
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+            color: var(--color-muted);
+            width: 28px;
+            text-align: center;
+        }
+        .result-name { font-weight: 500; font-size: 15px; white-space: nowrap; }
+        .result-bar-wrap {
+            flex: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .result-bar {
+            height: 100%;
+            border-radius: 4px;
+            background: var(--color-cta);
+            transition: width 600ms ease;
+        }
+        .result-count {
+            font-family: 'Fira Code', monospace;
+            font-size: 16px;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: right;
+        }
+        .result-item.winner .result-name { color: var(--color-cta); }
+        .result-item.winner .result-count { color: var(--color-cta); }
+        .result-item.winner .result-bar { background: var(--color-cta); box-shadow: 0 0 8px rgba(34,197,94,0.4); }
+        /* --- Contract Info --- */
+        .contract-info {
+            font-size: 13px;
+            color: var(--color-muted);
+            font-family: 'Fira Code', monospace;
+        }
+        .contract-info p { margin-bottom: 4px; }
+        .contract-info a { color: var(--color-info); text-decoration: none; }
+        .contract-info a:hover { text-decoration: underline; }
+        /* --- Loading --- */
+        .loading {
+            display: inline-block;
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* --- Log Sidebar --- */
+        .log-sidebar {
+            width: 360px;
+            flex-shrink: 0;
+            background: var(--color-primary);
+            border-left: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 56px);
+        }
+        .log-sidebar-header {
+            padding: 12px 16px;
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-text);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .log-sidebar-header svg { color: var(--color-cta); }
+        .log-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
         }
         .log-entry {
-            font-family: 'Consolas', 'Monaco', monospace; font-size: 13px;
-            padding: 5px 0; border-bottom: 1px solid #333;
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            padding: 4px 16px;
+            border-bottom: 1px solid var(--color-border);
+            line-height: 1.5;
+            word-break: break-all;
         }
         .log-entry:last-child { border-bottom: none; }
-        .log-time { color: #888; }
-        .log-info { color: #4fc3f7; }
-        .log-success { color: #81c784; }
-        .log-error { color: #e57373; }
-        .log-warning { color: #ffb74d; }
-        .alert { padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; }
-        .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .section-title { font-size: 18px; color: #333; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
-        .tx-link { color: #667eea; text-decoration: none; }
-        .tx-link:hover { text-decoration: underline; }
-        .loading { display: inline-block; width: 20px; height: 20px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .zkp-badge {
-            display: inline-block; padding: 4px 10px; border-radius: 20px;
-            background: linear-gradient(135deg, #00b09b, #96c93d); color: white;
-            font-size: 12px; font-weight: bold; margin-left: 10px;
+        .log-time { color: #64748B; }
+        .log-info { color: var(--color-info); }
+        .log-success { color: var(--color-cta); }
+        .log-error { color: var(--color-danger); }
+        .log-warning { color: var(--color-warning); }
+        /* --- Responsive --- */
+        @media (max-width: 1024px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .results-grid { grid-template-columns: 1fr; }
+            .app-layout { flex-direction: column; }
+            .log-sidebar { width: 100%; max-height: 200px; border-left: none; border-top: 1px solid var(--color-border); }
+            .container { max-height: none; }
+        }
+        @media (max-width: 768px) {
+            .candidates-grid { grid-template-columns: 1fr; }
+            .container { padding: 16px; }
+            .nav-content { padding: 0 16px; }
+            .nav-brand span.brand-text { display: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; animation: none !important; }
+        }
+        /* --- Focus States --- */
+        .btn:focus-visible, .cand-card:focus-visible, .nav-link:focus-visible, .nav-connect-btn:focus-visible {
+            outline: 2px solid var(--color-cta);
+            outline-offset: 2px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="card">
-            <h1>区块链电子投票系统 <span class="zkp-badge">ZKP</span></h1>
-            <h2 id="electionSubtitle">零知识证明投票系统</h2>
-            <div class="status-bar">
-                <div class="status-item">
-                    <div class="status-label">钱包状态</div>
-                    <div class="status-value" id="walletStatus">未连接</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">账户地址</div>
-                    <div class="status-value" id="accountAddress">-</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">选举状态</div>
-                    <div class="status-value" id="electionStatus">-</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">总投票数</div>
-                    <div class="status-value" id="totalVotes">-</div>
-                </div>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="nav-brand">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/></svg>
+                <span class="brand-text">区块链电子投票</span>
+                <span class="zkp-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    ZKP
+                </span>
             </div>
-            <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()">连接 MetaMask</button>
-        </div>
-
-        <div class="alert alert-warning" id="notRegisteredAlert" style="display: none;">
-            你的账户尚未注册为选民，请联系管理员注册后再投票。
-        </div>
-        <div class="alert alert-success" id="alreadyVotedAlert" style="display: none;">
-            你已经投过票了！感谢你的参与。
-        </div>
-
-        <div class="card" id="votingCard" style="display: none;">
-            <div class="section-title">选择你支持的候选人</div>
-            <div class="candidates" id="candidatesList"></div>
-            <button class="btn btn-primary" id="voteBtn" onclick="submitVote()" disabled>提交投票 (ZKP)</button>
-        </div>
-
-        <div class="card" id="resultsCard" style="display: none;">
-            <div class="section-title">选举结果</div>
-            <div id="resultsContainer"></div>
-        </div>
-
-        <div class="card">
-            <div class="section-title">操作日志</div>
-            <div class="log-container" id="logContainer">
-                <div class="log-entry"><span class="log-time">[系统]</span> <span class="log-info">请连接 MetaMask 钱包开始投票</span></div>
+            <div class="nav-actions">
+                <a class="nav-link" href="admin.html">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                    管理控制台
+                </a>
+                <button class="nav-connect-btn" id="connectBtn" onclick="connectWallet()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                    连接 MetaMask
+                </button>
             </div>
         </div>
+    </nav>
 
-        <div class="card">
-            <div class="section-title">合约信息</div>
-            <p><strong>Voting:</strong> <a class="tx-link" id="contractLink" href="#" target="_blank"></a></p>
-            <p><strong>网络:</strong> <span id="networkInfo"></span></p>
-            <p><strong>ZKP:</strong> Groth16 on BN254 + ElGamal on BabyJubJub</p>
+    <div class="app-layout">
+    <!-- Main Content -->
+    <main class="container">
+        <div class="subtitle" id="electionSubtitle">零知识证明投票系统</div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">钱包状态</div>
+                <div class="stat-val" id="walletStatus">未连接</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">账户地址</div>
+                <div class="stat-val" id="accountAddress" style="font-size:13px;">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">选举状态</div>
+                <div class="stat-val" id="electionStatus">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">总投票数</div>
+                <div class="stat-val" id="totalVotes">-</div>
+            </div>
         </div>
+
+        <!-- Alerts -->
+        <div id="alerts">
+            <div class="alert alert-warning" id="notRegisteredAlert" style="display:none;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                你的账户尚未注册为选民，请联系管理员注册后再投票。
+            </div>
+            <div class="alert alert-success" id="alreadyVotedAlert" style="display:none;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                你已经投过票了！感谢你的参与。
+            </div>
+        </div>
+        <!-- Voting Section -->
+        <div class="section" id="votingCard" style="display:none;">
+            <div class="section-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>
+                选择你支持的候选人
+            </div>
+            <div class="candidates-grid" id="candidatesList"></div>
+            <div class="vote-action">
+                <button class="btn btn-cta" id="voteBtn" onclick="submitVote()" disabled>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    提交投票 (ZKP)
+                </button>
+            </div>
+        </div>
+
+        <!-- Candidates Preview (when not voting) -->
+        <div class="section" id="candidatesPreview" style="display:none;">
+            <div class="section-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                候选人列表
+            </div>
+            <div class="candidates-grid" id="candidatesPreviewList"></div>
+        </div>
+
+        <!-- Results Grid (2-col: results + contract info) -->
+        <div class="results-grid" id="resultsGrid" style="display:none;">
+            <div class="section" id="resultsCard">
+                <div class="section-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    选举结果
+                </div>
+                <div id="resultsContainer"></div>
+            </div>
+            <div class="section">
+                <div class="section-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                    合约信息
+                </div>
+                <div class="contract-info">
+                    <p>Voting: <a id="contractLink" href="#" target="_blank"></a></p>
+                    <p>网络: <span id="networkInfo"></span></p>
+                    <p>ZKP: Groth16 on BN254 + ElGamal on BabyJubJub</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contract Info Standalone (hidden when results shown) -->
+        <div class="section" id="contractInfoStandalone">
+            <div class="section-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                合约信息
+            </div>
+            <div class="contract-info">
+                <p>Voting: <a id="contractLink2" href="#" target="_blank"></a></p>
+                <p>网络: <span id="networkInfo2"></span></p>
+                <p>ZKP: Groth16 on BN254 + ElGamal on BabyJubJub</p>
+            </div>
+        </div>
+    </main>
+    <!-- Log Sidebar -->
+    <aside class="log-sidebar" id="logPanel">
+        <div class="log-sidebar-header">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            操作日志
+        </div>
+        <div class="log-body" id="logBody"></div>
+    </aside>
     </div>
 
     <!-- Dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.9.0/ethers.umd.min.js"></script>
     <script src="https://unpkg.com/snarkjs@0.7.3/build/snarkjs.min.js"></script>
-    <script src="https://unpkg.com/circomlibjs@0.1.7/build/circomlibjs.umd.js"></script>
+    <script src="lib/circomlibjs.bundle.js"></script>
     <script src="config.js"></script>
     <script src="lib/elgamal.js"></script>
     <script>
@@ -182,18 +617,29 @@
         let provider, signer, votingContract, voterRegistryContract, currentAccount;
         let selectedCandidate = null;
         let candidates = [];
-        let elgamal = null; // Initialized ElGamal library
-        let adminPK = null; // ElGamal public key from contract
+        let elgamal = null;
+        let adminPK = null;
         const STATUS_NAMES = ["已创建", "进行中", "已结束", "已计票"];
+        const AVATAR_COLORS = [
+            'linear-gradient(135deg,#22C55E,#16A34A)',
+            'linear-gradient(135deg,#3B82F6,#2563EB)',
+            'linear-gradient(135deg,#A855F7,#7C3AED)',
+            'linear-gradient(135deg,#F59E0B,#D97706)',
+            'linear-gradient(135deg,#EF4444,#DC2626)',
+            'linear-gradient(135deg,#EC4899,#DB2777)',
+            'linear-gradient(135deg,#06B6D4,#0891B2)',
+            'linear-gradient(135deg,#8B5CF6,#6D28D9)',
+        ];
 
         function addLog(message, type = 'info') {
-            const container = document.getElementById('logContainer');
             const time = new Date().toLocaleTimeString();
+            const html = `<span class="log-time">[${time}]</span> <span class="log-${type}">${message}</span>`;
+            const body = document.getElementById('logBody');
             const entry = document.createElement('div');
             entry.className = 'log-entry';
-            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${message}</span>`;
-            container.appendChild(entry);
-            container.scrollTop = container.scrollHeight;
+            entry.innerHTML = html;
+            body.appendChild(entry);
+            body.scrollTop = body.scrollHeight;
         }
 
         async function initZKP() {
@@ -205,17 +651,14 @@
                 addLog(`ZKP 库初始化失败: ${error.message}`, 'error');
             }
         }
-
         async function connectWallet() {
             if (typeof window.ethereum === 'undefined') {
                 addLog('请安装 MetaMask 钱包！', 'error');
                 alert('请安装 MetaMask 钱包！\n下载: https://metamask.io');
                 return;
             }
-
             try {
                 addLog('正在连接 MetaMask...', 'info');
-
                 provider = new ethers.BrowserProvider(window.ethereum);
                 const accounts = await provider.send("eth_requestAccounts", []);
                 currentAccount = accounts[0];
@@ -255,27 +698,25 @@
                 voterRegistryContract = new ethers.Contract(VOTER_REGISTRY_ADDRESS, VOTER_REGISTRY_ABI, provider);
 
                 document.getElementById('walletStatus').textContent = '已连接';
-                document.getElementById('walletStatus').className = 'status-value connected';
+                document.getElementById('walletStatus').classList.add('connected');
                 document.getElementById('accountAddress').textContent = currentAccount.slice(0, 6) + '...' + currentAccount.slice(-4);
-                document.getElementById('connectBtn').textContent = '已连接';
-                document.getElementById('connectBtn').disabled = true;
 
-                // Load ElGamal public key from contract
+                const btn = document.getElementById('connectBtn');
+                btn.className = 'nav-connect-btn connected';
+                btn.innerHTML = '已连接 ' + currentAccount.slice(0, 6) + '...' + currentAccount.slice(-4);
+                btn.disabled = true;
                 try {
                     const pk = await votingContract.getElgamalPK();
                     adminPK = elgamal.pkFromBigInts(pk[0].toString(), pk[1].toString());
                     addLog('已加载 ElGamal 公钥', 'success');
                 } catch (e) {
-                    // Fallback to config
                     adminPK = elgamal.pkFromBigInts(CONTRACT_CONFIG.ELGAMAL_PK.x, CONTRACT_CONFIG.ELGAMAL_PK.y);
                     addLog('使用配置中的 ElGamal 公钥', 'info');
                 }
 
                 await loadElectionInfo();
-
                 window.ethereum.on('accountsChanged', () => window.location.reload());
                 window.ethereum.on('chainChanged', () => window.location.reload());
-
             } catch (error) {
                 if (error.code === 4001) {
                     addLog('用户拒绝了连接请求', 'warning');
@@ -285,81 +726,109 @@
             }
         }
 
+        function renderCandidateCards(containerId, canVote) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            candidates.forEach((c, i) => {
+                const card = document.createElement('div');
+                card.className = 'cand-card' + (canVote ? ' clickable' : '');
+                card.setAttribute('tabindex', canVote ? '0' : '-1');
+                card.setAttribute('role', canVote ? 'radio' : 'listitem');
+                if (canVote) {
+                    card.onclick = () => selectCandidate(i);
+                    card.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCandidate(i); } };
+                }
+                const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
+                card.innerHTML = `
+                    <div class="cand-avatar" style="background:${color}">${c.name.charAt(0)}</div>
+                    <div class="cand-info">
+                        <div class="cand-name">${c.name}</div>
+                        <div class="cand-votes">${c.votes} 票</div>
+                    </div>
+                    ${canVote ? `<div class="cand-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>` : ''}
+                `;
+                container.appendChild(card);
+            });
+        }
         async function loadElectionInfo() {
             try {
                 addLog('正在加载选举信息...', 'info');
-
                 const info = await votingContract.getElectionInfo();
                 const electionTitle = info[0];
-                const electionDesc = info[1];
                 const status = Number(info[2]);
                 const candidateCount = Number(info[3]);
                 const totalVotes = Number(info[4]);
 
                 document.getElementById('electionSubtitle').textContent =
                     `${electionTitle} - ${CONTRACT_CONFIG.NETWORK.name}`;
-
-                document.getElementById('electionStatus').textContent = STATUS_NAMES[status];
+                const statusEl = document.getElementById('electionStatus');
+                statusEl.textContent = STATUS_NAMES[status];
+                statusEl.className = 'stat-val' + (status === 1 ? ' active' : status === 0 ? ' warning' : '');
                 document.getElementById('totalVotes').textContent = totalVotes;
 
                 const isRegistered = await voterRegistryContract.isRegistered(currentAccount);
                 const hasVoted = await voterRegistryContract.hasVoted(currentAccount);
-
                 addLog(`选民状态: ${isRegistered ? '已注册' : '未注册'}, ${hasVoted ? '已投票' : '未投票'}`, 'info');
 
                 document.getElementById('notRegisteredAlert').style.display = isRegistered ? 'none' : 'block';
                 document.getElementById('alreadyVotedAlert').style.display = hasVoted ? 'block' : 'none';
 
                 candidates = [];
-                const candidatesList = document.getElementById('candidatesList');
-                candidatesList.innerHTML = '';
-
                 for (let i = 0; i < candidateCount; i++) {
                     const candidate = await votingContract.getCandidate(i);
                     candidates.push({ id: i, name: candidate[0], votes: Number(candidate[1]) });
-
-                    const card = document.createElement('div');
-                    card.className = 'candidate-card';
-                    card.onclick = () => selectCandidate(i);
-                    card.innerHTML = `
-                        <div class="candidate-avatar">${candidate[0].charAt(0)}</div>
-                        <div class="candidate-info">
-                            <div class="candidate-name">${candidate[0]}</div>
-                            <div class="candidate-votes">当前得票: ${candidate[1]}</div>
-                        </div>
-                        <div class="candidate-check" id="check-${i}">&#10003;</div>
-                    `;
-                    candidatesList.appendChild(card);
                 }
 
-                if (status === 1 && isRegistered && !hasVoted) {
+                const canVote = status === 1 && isRegistered && !hasVoted;
+                if (canVote) {
                     document.getElementById('votingCard').style.display = 'block';
-                    document.getElementById('resultsCard').style.display = 'none';
+                    document.getElementById('candidatesPreview').style.display = 'none';
+                    document.getElementById('resultsGrid').style.display = 'none';
+                    document.getElementById('contractInfoStandalone').style.display = 'block';
+                    renderCandidateCards('candidatesList', true);
                     addLog('选举进行中，请选择候选人投票', 'success');
                 } else if (status === 3) {
-                    // 已计票 - 显示结果
                     document.getElementById('votingCard').style.display = 'none';
-                    document.getElementById('resultsCard').style.display = 'block';
-                    const resultsHtml = candidates.map(c =>
-                        `<div style="display:flex;justify-content:space-between;align-items:center;padding:15px 20px;background:#f8f9fa;border-radius:10px;margin-bottom:10px;">
-                            <span style="font-size:18px;font-weight:bold;">${c.name}</span>
-                            <span style="font-size:24px;font-weight:bold;color:#667eea;">${c.votes} 票</span>
-                        </div>`
-                    ).join('');
-                    document.getElementById('resultsContainer').innerHTML = resultsHtml;
+                    document.getElementById('candidatesPreview').style.display = 'none';
+                    document.getElementById('resultsGrid').style.display = 'grid';
+                    document.getElementById('contractInfoStandalone').style.display = 'none';
+                    renderResults();
                     addLog('选举已计票，结果已公布', 'success');
                 } else {
+                    document.getElementById('votingCard').style.display = 'none';
+                    document.getElementById('resultsGrid').style.display = 'none';
+                    document.getElementById('contractInfoStandalone').style.display = 'block';
+                    if (candidates.length > 0) {
+                        document.getElementById('candidatesPreview').style.display = 'block';
+                        renderCandidateCards('candidatesPreviewList', false);
+                    }
                     addLog(`选举状态: ${STATUS_NAMES[status]}`, 'warning');
                 }
-
             } catch (error) {
                 addLog(`加载失败: ${error.message}`, 'error');
             }
         }
+        function renderResults() {
+            const maxVotes = Math.max(...candidates.map(c => c.votes), 1);
+            const sorted = [...candidates].sort((a, b) => b.votes - a.votes);
+            const winnerVotes = sorted[0]?.votes || 0;
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = sorted.map((c, i) => {
+                const pct = Math.round((c.votes / maxVotes) * 100);
+                const isWinner = c.votes === winnerVotes && winnerVotes > 0;
+                return `<div class="result-item${isWinner ? ' winner' : ''}">
+                    <div class="result-rank">#${i + 1}</div>
+                    <div class="result-name">${c.name}</div>
+                    <div class="result-bar-wrap"><div class="result-bar" style="width:${pct}%"></div></div>
+                    <div class="result-count">${c.votes} 票</div>
+                </div>`;
+            }).join('');
+        }
 
         function selectCandidate(id) {
-            document.querySelectorAll('.candidate-card').forEach(card => card.classList.remove('selected'));
-            document.querySelectorAll('.candidate-card')[id].classList.add('selected');
+            const cards = document.querySelectorAll('#candidatesList .cand-card');
+            cards.forEach(card => card.classList.remove('selected'));
+            cards[id].classList.add('selected');
             selectedCandidate = id;
             document.getElementById('voteBtn').disabled = false;
             addLog(`已选择: ${candidates[id].name}`, 'info');
@@ -367,7 +836,6 @@
 
         async function submitVote() {
             if (selectedCandidate === null || !elgamal) return;
-
             try {
                 const voteBtn = document.getElementById('voteBtn');
                 voteBtn.disabled = true;
@@ -376,26 +844,19 @@
                 const numCandidates = candidates.length;
                 addLog(`正在为 ${candidates[selectedCandidate].name} 生成加密投票...`, 'info');
 
-                // 1. Generate random salt
                 const salt = elgamal.randomFieldElement();
-
-                // 2. Encrypt vote as one-hot vector
                 const { ciphertexts, randomness } = elgamal.encryptVoteOneHot(
                     selectedCandidate, numCandidates, adminPK
                 );
                 addLog('ElGamal 加密完成 (one-hot 向量)', 'success');
 
-                // 3. Compute Poseidon commitment and ciphertext hash
                 const commitment = elgamal.computeCommitment(selectedCandidate, salt);
                 const ciphertextHash = elgamal.computeCiphertextHash(ciphertexts);
                 addLog(`Poseidon 承诺: ${commitment.toString().slice(0, 20)}...`, 'info');
 
-                // 4. Prepare witness for ZKP circuit
                 const witness = elgamal.prepareVoteWitness(
                     selectedCandidate, numCandidates, salt, adminPK, ciphertexts, randomness
                 );
-
-                // 5. Generate ZKP proof
                 addLog('正在生成 Groth16 零知识证明 (约 1-3 秒)...', 'info');
                 voteBtn.innerHTML = '<span class="loading"></span> ZKP 证明生成中...';
 
@@ -406,43 +867,29 @@
                 );
                 addLog('ZKP 证明生成成功!', 'success');
 
-                // 6. Convert proof to Solidity calldata format
                 const calldataStr = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
                 const calldata = JSON.parse(`[${calldataStr}]`);
+                const pA = calldata[0], pB = calldata[1], pC = calldata[2];
 
-                const pA = calldata[0];
-                const pB = calldata[1];
-                const pC = calldata[2];
-
-                // 7. Prepare encrypted vote data for event
                 const encryptedVoteArray = elgamal.ciphertextsToUint256Array(ciphertexts);
-
-                // 8. Convert commitment and ciphertextHash to bytes32
                 const commitmentHex = "0x" + commitment.toString(16).padStart(64, "0");
                 const ciphertextHashHex = "0x" + ciphertextHash.toString(16).padStart(64, "0");
 
-                // 9. Submit to contract
                 addLog('请在 MetaMask 中确认交易', 'warning');
                 voteBtn.innerHTML = '<span class="loading"></span> 等待确认...';
 
                 const tx = await votingContract.castVote(
-                    commitmentHex,
-                    ciphertextHashHex,
-                    pA,
-                    pB,
-                    pC,
+                    commitmentHex, ciphertextHashHex, pA, pB, pC,
                     encryptedVoteArray.map(x => x.toString())
                 );
                 addLog('交易已发送，等待确认...', 'info');
-
                 await tx.wait();
 
                 addLog('投票成功! (含零知识证明)', 'success');
                 if (CONTRACT_CONFIG.NETWORK.explorerUrl) {
-                    addLog(`<a class="tx-link" href="${CONTRACT_CONFIG.NETWORK.explorerUrl}/tx/${tx.hash}" target="_blank">查看交易</a>`, 'success');
+                    addLog(`<a style="color:var(--color-info);text-decoration:none;" href="${CONTRACT_CONFIG.NETWORK.explorerUrl}/tx/${tx.hash}" target="_blank">查看交易</a>`, 'success');
                 }
 
-                // Save salt to localStorage for later verification
                 const voteReceipt = {
                     candidateId: selectedCandidate,
                     salt: salt.toString(),
@@ -455,7 +902,6 @@
 
                 await loadElectionInfo();
                 voteBtn.innerHTML = '已投票';
-
             } catch (error) {
                 addLog(`投票失败: ${error.message}`, 'error');
                 console.error('Vote error:', error);
@@ -463,20 +909,21 @@
                 document.getElementById('voteBtn').innerHTML = '提交投票 (ZKP)';
             }
         }
-
         window.addEventListener('load', async () => {
             const link = document.getElementById('contractLink');
+            const link2 = document.getElementById('contractLink2');
             const explorerUrl = CONTRACT_CONFIG.NETWORK.explorerUrl;
+            const addrShort = VOTING_ADDRESS.slice(0, 9) + '...' + VOTING_ADDRESS.slice(-8);
             if (explorerUrl) {
                 link.href = `${explorerUrl}/address/${VOTING_ADDRESS}`;
-            } else {
-                link.href = '#';
+                link2.href = `${explorerUrl}/address/${VOTING_ADDRESS}`;
             }
-            link.textContent = VOTING_ADDRESS.slice(0, 9) + '...' + VOTING_ADDRESS.slice(-8);
-            document.getElementById('networkInfo').textContent =
-                `${CONTRACT_CONFIG.NETWORK.name} (Chain ID: ${CONTRACT_CONFIG.NETWORK.chainId})`;
+            link.textContent = addrShort;
+            link2.textContent = addrShort;
+            const networkText = `${CONTRACT_CONFIG.NETWORK.name} (Chain ID: ${CONTRACT_CONFIG.NETWORK.chainId})`;
+            document.getElementById('networkInfo').textContent = networkText;
+            document.getElementById('networkInfo2').textContent = networkText;
 
-            // Initialize ZKP library
             await initZKP();
 
             if (typeof window.ethereum !== 'undefined') {
