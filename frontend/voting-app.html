@@ -384,6 +384,49 @@
         .contract-info p { margin-bottom: 4px; }
         .contract-info a { color: var(--color-info); text-decoration: none; }
         .contract-info a:hover { text-decoration: underline; }
+        .verify-help {
+            font-size: 12px;
+            color: var(--color-muted);
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+        .verify-textarea {
+            width: 100%;
+            min-height: 92px;
+            resize: vertical;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+            background: rgba(15, 23, 42, 0.6);
+            color: var(--color-text);
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            margin-top: 6px;
+            margin-bottom: 10px;
+        }
+        .verify-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .verify-result {
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            color: var(--color-muted);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.02);
+        }
+        .verify-result.success {
+            color: var(--color-cta);
+            border-color: rgba(34,197,94,0.35);
+        }
+        .verify-result.error {
+            color: var(--color-danger);
+            border-color: rgba(239,68,68,0.35);
+        }
         /* --- Loading --- */
         .loading {
             display: inline-block;
@@ -579,6 +622,26 @@
                 <p>ZKP: Groth16 on BN254 + ElGamal on BabyJubJub</p>
             </div>
         </div>
+
+        <div class="section" id="verifySection">
+            <div class="section-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/></svg>
+                Verify My Vote (Anonymous)
+            </div>
+            <div class="verify-help">
+                Use your local receipt (`candidateId + salt + commitment`) and an `audit_bundle.json` exported by the admin to verify inclusion without address lookup.
+            </div>
+            <div class="verify-actions">
+                <button class="btn btn-cta" type="button" onclick="loadLocalReceipt()">Load Local Receipt</button>
+                <input id="auditBundleFile" type="file" accept=".json,application/json" />
+                <button class="btn btn-cta" type="button" onclick="verifyMyVote()">Run Verification</button>
+            </div>
+            <label for="receiptInput" class="verify-help">Receipt JSON</label>
+            <textarea id="receiptInput" class="verify-textarea" placeholder='{"candidateId":0,"salt":"...","commitment":"..."}'></textarea>
+            <label for="auditBundleInput" class="verify-help">Audit Bundle JSON</label>
+            <textarea id="auditBundleInput" class="verify-textarea" placeholder='{"root":"0x...","entries":[...]}'></textarea>
+            <div id="verifyResult" class="verify-result">No verification has been run yet.</div>
+        </div>
     </main>
     <!-- Log Sidebar -->
     <aside class="log-sidebar" id="logPanel">
@@ -596,6 +659,7 @@
     <script src="lib/circomlibjs.bundle.js"></script>
     <script src="config.js"></script>
     <script src="lib/elgamal.js"></script>
+    <script src="lib/audit.js"></script>
     <script>
         const VOTING_ADDRESS = CONTRACT_CONFIG.VOTING_ADDRESS;
         const VOTER_REGISTRY_ADDRESS = CONTRACT_CONFIG.VOTER_REGISTRY_ADDRESS;
@@ -619,6 +683,7 @@
         let candidates = [];
         let elgamal = null;
         let adminPK = null;
+        let loadedAuditBundle = null;
         const STATUS_NAMES = ["已创建", "进行中", "已结束", "已计票"];
         const AVATAR_COLORS = [
             'linear-gradient(135deg,#22C55E,#16A34A)',
@@ -640,6 +705,113 @@
             entry.innerHTML = html;
             body.appendChild(entry);
             body.scrollTop = body.scrollHeight;
+        }
+
+        function toCommitmentHex(value) {
+            if (typeof value === 'string' && value.startsWith('0x')) {
+                return AuditLib.normalizeBytes32(value);
+            }
+            const commitmentBI = BigInt(value);
+            return AuditLib.normalizeBytes32('0x' + commitmentBI.toString(16));
+        }
+
+        function setVerifyResult(message, status = 'info') {
+            const box = document.getElementById('verifyResult');
+            box.textContent = message;
+            box.className = 'verify-result';
+            if (status === 'success') box.classList.add('success');
+            if (status === 'error') box.classList.add('error');
+        }
+
+        function loadLocalReceipt() {
+            if (!currentAccount) {
+                addLog('Connect wallet first to load local receipt', 'warning');
+                return;
+            }
+            const key = `vote_receipt_${currentAccount}`;
+            const data = localStorage.getItem(key);
+            if (!data) {
+                addLog('No local receipt found for this wallet', 'warning');
+                setVerifyResult('No local receipt found for this wallet.', 'error');
+                return;
+            }
+            document.getElementById('receiptInput').value = data;
+            addLog('Local receipt loaded', 'success');
+        }
+
+        function loadAuditBundleFromText(raw) {
+            const parsed = JSON.parse(raw);
+            if (!parsed || !parsed.root || !Array.isArray(parsed.entries)) {
+                throw new Error('Invalid audit bundle format');
+            }
+            loadedAuditBundle = parsed;
+            document.getElementById('auditBundleInput').value = JSON.stringify(parsed, null, 2);
+            return parsed;
+        }
+
+        async function loadAuditBundleFile(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            try {
+                const raw = await file.text();
+                loadAuditBundleFromText(raw);
+                addLog(`Audit bundle loaded from file: ${file.name}`, 'success');
+            } catch (error) {
+                addLog(`Failed to read audit bundle: ${error.message}`, 'error');
+                setVerifyResult(`Invalid audit bundle file: ${error.message}`, 'error');
+            }
+        }
+
+        function verifyMyVote() {
+            try {
+                if (!elgamal) throw new Error('ZKP library not initialized');
+
+                const receiptRaw = document.getElementById('receiptInput').value.trim();
+                if (!receiptRaw) throw new Error('Receipt JSON is required');
+                const receipt = JSON.parse(receiptRaw);
+
+                const auditRaw = document.getElementById('auditBundleInput').value.trim();
+                const bundle = auditRaw ? loadAuditBundleFromText(auditRaw) : loadedAuditBundle;
+                if (!bundle) throw new Error('Audit bundle JSON is required');
+
+                if (receipt.electionId && bundle.electionId && receipt.electionId !== bundle.electionId) {
+                    throw new Error('Election ID mismatch between receipt and audit bundle');
+                }
+
+                const computedCommitment = elgamal.computeCommitment(
+                    Number(receipt.candidateId),
+                    BigInt(receipt.salt)
+                );
+                const computedHex = toCommitmentHex(computedCommitment);
+                const receiptHex = toCommitmentHex(receipt.commitment);
+                if (computedHex !== receiptHex) {
+                    throw new Error('Receipt commitment does not match candidateId+salt');
+                }
+
+                const candidates = AuditLib.findEntriesByCommitment(bundle, receiptHex);
+                if (candidates.length === 0) {
+                    throw new Error('Commitment not found in audit bundle');
+                }
+
+                let entry = candidates[0];
+                if (receipt.txHash) {
+                    const byTx = candidates.find(
+                        (item) => item.txHash && item.txHash.toLowerCase() === String(receipt.txHash).toLowerCase()
+                    );
+                    if (byTx) entry = byTx;
+                }
+
+                const included = AuditLib.verifyProof(entry.commitment, entry.proof, bundle.root, entry.index);
+                if (!included) throw new Error('Merkle proof verification failed');
+
+                const summary = `Verified: commitment is included (index=${entry.index}, root=${bundle.root.slice(0, 18)}...)`;
+                setVerifyResult(summary, 'success');
+                addLog(summary, 'success');
+            } catch (error) {
+                const message = `Verification failed: ${error.message}`;
+                setVerifyResult(message, 'error');
+                addLog(message, 'error');
+            }
         }
 
         async function initZKP() {
@@ -714,6 +886,12 @@
                     addLog('使用配置中的 ElGamal 公钥', 'info');
                 }
 
+                const cachedReceipt = localStorage.getItem(`vote_receipt_${currentAccount}`);
+                if (cachedReceipt) {
+                    document.getElementById('receiptInput').value = cachedReceipt;
+                    addLog('Loaded local receipt for current wallet', 'info');
+                }
+
                 await loadElectionInfo();
                 window.ethereum.on('accountsChanged', () => window.location.reload());
                 window.ethereum.on('chainChanged', () => window.location.reload());
@@ -739,14 +917,32 @@
                     card.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCandidate(i); } };
                 }
                 const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
-                card.innerHTML = `
-                    <div class="cand-avatar" style="background:${color}">${c.name.charAt(0)}</div>
-                    <div class="cand-info">
-                        <div class="cand-name">${c.name}</div>
-                        <div class="cand-votes">${c.votes} 票</div>
-                    </div>
-                    ${canVote ? `<div class="cand-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>` : ''}
-                `;
+
+                const avatar = document.createElement('div');
+                avatar.className = 'cand-avatar';
+                avatar.style.background = color;
+                avatar.textContent = c.name.charAt(0);
+
+                const info = document.createElement('div');
+                info.className = 'cand-info';
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'cand-name';
+                nameDiv.textContent = c.name;
+                const votesDiv = document.createElement('div');
+                votesDiv.className = 'cand-votes';
+                votesDiv.textContent = `${c.votes} 票`;
+                info.appendChild(nameDiv);
+                info.appendChild(votesDiv);
+
+                card.appendChild(avatar);
+                card.appendChild(info);
+
+                if (canVote) {
+                    const check = document.createElement('div');
+                    check.className = 'cand-check';
+                    check.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                    card.appendChild(check);
+                }
                 container.appendChild(card);
             });
         }
@@ -894,7 +1090,9 @@
                     candidateId: selectedCandidate,
                     salt: salt.toString(),
                     commitment: commitment.toString(),
+                    commitmentHex: commitmentHex,
                     txHash: tx.hash,
+                    electionId: AuditLib.electionKey(CONTRACT_CONFIG.NETWORK.chainId, VOTING_ADDRESS),
                     timestamp: Date.now()
                 };
                 localStorage.setItem(`vote_receipt_${currentAccount}`, JSON.stringify(voteReceipt));
@@ -923,6 +1121,19 @@
             const networkText = `${CONTRACT_CONFIG.NETWORK.name} (Chain ID: ${CONTRACT_CONFIG.NETWORK.chainId})`;
             document.getElementById('networkInfo').textContent = networkText;
             document.getElementById('networkInfo2').textContent = networkText;
+            document.getElementById('auditBundleFile').addEventListener('change', loadAuditBundleFile);
+
+            const electionId = AuditLib.electionKey(CONTRACT_CONFIG.NETWORK.chainId, VOTING_ADDRESS);
+            const cachedBundle = localStorage.getItem('audit_bundle_' + electionId);
+            if (cachedBundle) {
+                try {
+                    loadedAuditBundle = JSON.parse(cachedBundle);
+                    document.getElementById('auditBundleInput').value = JSON.stringify(loadedAuditBundle, null, 2);
+                    addLog('Loaded cached audit bundle from local storage', 'info');
+                } catch (error) {
+                    addLog(`Failed to parse cached audit bundle: ${error.message}`, 'warning');
+                }
+            }
 
             await initZKP();
 

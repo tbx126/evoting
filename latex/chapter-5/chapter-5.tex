@@ -1,0 +1,19 @@
+\chapter{Results, Auditability, and Security Analysis}
+\begingroup
+\justifying
+\setlength{\parindent}{0pt}
+\setstretch{2}
+\setlength{\parskip}{0.5\baselineskip}
+\titlespacing{\chapter}{0pt}{0pt}{0pt}
+\titlespacing{\section}{0pt}{0pt}{0pt}
+
+\section{Implementation-Level Verification Results}
+The repository provides two automated verification layers. First, smart-contract integration tests validate election lifecycle constraints, voter registration rules, vote submission with Groth16 proof verification, tally submission with ZKP3 verification, and end-to-end workflow consistency. Second, cryptographic unit tests validate BabyJubJub arithmetic, key generation, encryption/decryption, homomorphic aggregation, and discrete-log recovery under bounded ranges.
+
+\section{Commitment Merkle Audit Workflow}
+The tally flow now derives a Merkle root from on-chain vote commitments and submits this root to the contract during result finalization. The admin interface exports an audit bundle containing the root, ordered commitment entries, and inclusion proofs. On the voter side, verification proceeds by recomputing commitment from the local receipt (candidate identifier and salt), then validating inclusion proof against the published root. This closes the audit loop without requiring address-based record lookup.
+
+\section{Comparative Security Analysis}
+Compared with a traditional centralized model, the implemented architecture improves state integrity and anti-tampering properties through contract-enforced transitions and immutable logs. Privacy is strengthened by encrypted ballots and zero-knowledge validation of correctness constraints. Remaining trust assumptions are primarily key custody and client-environment security. Therefore, the design significantly raises the assurance baseline while still requiring operational safeguards around administrator key management and deployment hardening.
+
+\endgroup

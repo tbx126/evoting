@@ -494,11 +494,15 @@
             </div>
             <div class="alert alert-info">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                计票流程: 结束选举 → 读取加密选票 → 同态聚合 → 解密 → 生成 ZKP3 证明 → 上传结果
+                计票流程: 结束选举 &rarr; 读取加密选票 &rarr; 同态聚合 &rarr; 解密 &rarr; 生成 ZKP3 证明 &rarr; 上传结果
             </div>
             <button class="btn btn-warning" id="tallyBtn" onclick="submitTallyWithZKP()" disabled>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 同态计票 + 生成 ZKP3 证明
+            </button>
+            <button class="btn btn-cta" id="downloadAuditBtn" onclick="downloadLatestAuditBundle()" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                导出审计包 (Audit Bundle JSON)
             </button>
             <div id="tallyResults" style="margin-top:12px;"></div>
         </div>
@@ -520,6 +524,7 @@
     <script src="lib/circomlibjs.bundle.js"></script>
     <script src="config.js"></script>
     <script src="lib/elgamal.js"></script>
+    <script src="lib/audit.js"></script>
     <script>
         const VOTING_ADDRESS = CONTRACT_CONFIG.VOTING_ADDRESS;
         const VOTER_REGISTRY_ADDRESS = CONTRACT_CONFIG.VOTER_REGISTRY_ADDRESS;
@@ -549,16 +554,47 @@
         let elgamal = null;
         let adminSK = null;
         let adminPK = null;
+        let latestAuditBundle = null;
         const STATUS_NAMES = ["已创建", "进行中", "已结束", "已计票"];
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
 
         function addLog(message, type = 'info') {
             const logBody = document.getElementById('logBody');
             const time = new Date().toLocaleTimeString();
             const entry = document.createElement('div');
             entry.className = 'log-entry';
-            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${message}</span>`;
+            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${escapeHtml(message)}</span>`;
             logBody.appendChild(entry);
             logBody.scrollTop = logBody.scrollHeight;
+        }
+
+        function downloadJsonFile(filename, payload) {
+            const json = JSON.stringify(payload, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadLatestAuditBundle() {
+            if (!latestAuditBundle) {
+                addLog('暂无审计包可导出，请先完成计票', 'warning');
+                return;
+            }
+            const shortAddr = VOTING_ADDRESS.slice(2, 10).toLowerCase();
+            const fileName = `audit_bundle_${latestAuditBundle.chainId}_${shortAddr}.json`;
+            downloadJsonFile(fileName, latestAuditBundle);
+            addLog(`审计包已导出: ${fileName}`, 'success');
         }
 
         function loadAdminKey() {
@@ -611,6 +647,14 @@
                 signer = await provider.getSigner();
                 votingContract = new ethers.Contract(VOTING_ADDRESS, VOTING_ABI, signer);
                 voterRegistryContract = new ethers.Contract(VOTER_REGISTRY_ADDRESS, VOTER_REGISTRY_ABI, signer);
+
+                const cachedElectionId = AuditLib.electionKey(CONTRACT_CONFIG.NETWORK.chainId, VOTING_ADDRESS);
+                const cachedBundle = localStorage.getItem('audit_bundle_' + cachedElectionId);
+                if (cachedBundle) {
+                    latestAuditBundle = JSON.parse(cachedBundle);
+                    document.getElementById('downloadAuditBtn').disabled = false;
+                    addLog('已加载缓存的审计包', 'info');
+                }
 
                 const votingAdmin = await votingContract.admin();
                 if (votingAdmin.toLowerCase() !== currentAccount.toLowerCase()) {
@@ -676,7 +720,17 @@
                 for (let i = 0; i < candidateCount; i++) {
                     const candidate = await votingContract.getCandidate(i);
                     candidates.push({ id: i, name: candidate[0], votes: Number(candidate[1]) });
-                    candidateList.innerHTML += `<div class="candidate-item"><span class="name">${candidate[0]}</span><span class="votes">${candidate[1]} 票</span></div>`;
+                    const item = document.createElement('div');
+                    item.className = 'candidate-item';
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'name';
+                    nameSpan.textContent = candidate[0];
+                    const votesSpan = document.createElement('span');
+                    votesSpan.className = 'votes';
+                    votesSpan.textContent = `${candidate[1]} 票`;
+                    item.appendChild(nameSpan);
+                    item.appendChild(votesSpan);
+                    candidateList.appendChild(item);
                 }
                 addLog('选举信息已加载', 'success');
             } catch (error) {
@@ -826,9 +880,21 @@
                 }
 
                 const tallyResultsDiv = document.getElementById('tallyResults');
-                tallyResultsDiv.innerHTML = results.map((r, i) =>
-                    `<div class="candidate-item"><span class="name">${candidates[i].name}</span><span class="votes">${r} 票</span></div>`
-                ).join('');
+                tallyResultsDiv.innerHTML = '';
+                results.forEach((r, i) => {
+                    const item = document.createElement('div');
+                    item.className = 'candidate-item';
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'name';
+                    nameSpan.textContent = candidates[i].name;
+                    const votesSpan = document.createElement('span');
+                    votesSpan.className = 'votes';
+                    votesSpan.textContent = `${r} 票`;
+                    item.appendChild(nameSpan);
+                    item.appendChild(votesSpan);
+                    tallyResultsDiv.appendChild(item);
+                });
+
                 addLog('正在生成 ZKP3 计票证明 (Groth16)...', 'info');
                 btn.innerHTML = '<span class="loading"></span> ZKP3 证明生成中...';
 
@@ -850,7 +916,32 @@
                 const pA = calldata[0], pB = calldata[1], pC = calldata[2];
                 const pubSignals21 = calldata[3];
 
-                const merkleRoot = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(results)));
+                // Build Merkle audit tree from on-chain commitments
+                const sortedEvents = [...events].sort((a, b) => {
+                    const byBlock = Number(a.blockNumber) - Number(b.blockNumber);
+                    if (byBlock !== 0) return byBlock;
+                    const byTx = Number(a.transactionIndex) - Number(b.transactionIndex);
+                    if (byTx !== 0) return byTx;
+                    return Number(a.logIndex) - Number(b.logIndex);
+                });
+
+                const networkInfo = await provider.getNetwork();
+                const chainId = Number(networkInfo.chainId);
+                const electionId = AuditLib.electionKey(chainId, VOTING_ADDRESS);
+                const auditInput = sortedEvents.map((event) => ({
+                    commitment: event.args.commitment,
+                    txHash: event.transactionHash,
+                    blockNumber: Number(event.blockNumber),
+                    logIndex: Number(event.logIndex),
+                }));
+
+                const auditBundle = AuditLib.createAuditBundle(auditInput, {
+                    chainId: chainId,
+                    electionId: electionId,
+                    votingAddress: VOTING_ADDRESS,
+                });
+                const merkleRoot = auditBundle.root;
+                addLog(`Merkle 审计树已构建 (root: ${merkleRoot.slice(0, 18)}...)`, 'success');
 
                 addLog('正在提交计票结果 (含 ZKP3 证明)...', 'info');
                 btn.innerHTML = '<span class="loading"></span> 提交中...';
@@ -860,6 +951,15 @@
                 );
                 addLog('交易已发送，等待确认...', 'info');
                 await tx.wait();
+
+                latestAuditBundle = {
+                    ...auditBundle,
+                    tallyResults: results,
+                    tallyTxHash: tx.hash,
+                };
+                localStorage.setItem('audit_bundle_' + electionId, JSON.stringify(latestAuditBundle));
+                document.getElementById('downloadAuditBtn').disabled = false;
+                downloadLatestAuditBundle();
 
                 addLog('计票结果已上传并通过 ZKP 验证!', 'success');
                 await loadElectionInfo();

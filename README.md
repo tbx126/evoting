@@ -87,3 +87,22 @@ python -m pytest tests/ -v
 - 私钥请妥善保管，切勿提交到 Git
 - `.env` 和 `frontend/config.js` 已在 `.gitignore` 中排除
 - ZKP 资源文件 (WASM/zkey) 已在 `.gitignore` 中排除，需本地构建
+
+## Audit Bundle and Anonymous Vote Verification
+
+This project now supports a commitment-based Merkle audit workflow:
+
+1. Admin side:
+   - During tally, the admin page builds a Merkle tree from on-chain vote commitments.
+   - The Merkle root is submitted to `updateTallyResults`.
+   - An `audit_bundle.json` is exported and cached locally.
+
+2. Voter side:
+   - The voter keeps a local receipt containing `candidateId`, `salt`, and `commitment`.
+   - The voter page loads `audit_bundle.json` and verifies inclusion locally.
+   - Verification does not require address-based lookup.
+
+Merkle rules in this repository:
+- Leaf: `leaf = commitment` (no extra leaf hashing)
+- Internal node: `keccak256(abi.encodePacked(left, right))`
+- Odd layer handling: duplicate the last node
