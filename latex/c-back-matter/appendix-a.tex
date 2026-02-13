@@ -1,5 +1,5 @@
-\chapter*{\makebox[\textwidth][l]{Appendix A (optional)}}
-\addcontentsline{toc}{chapter}{Appendix A (optional}
+\chapter*{\makebox[\textwidth][l]{Appendix A: Reproducibility Guide}}
+\addcontentsline{toc}{chapter}{Appendix A: Reproducibility Guide}
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
@@ -8,6 +8,68 @@
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
 
-\lipsum[1-2]
+\section{Repository Structure}
+Key folders used during reproduction:
+\begin{itemize}
+    \item \texttt{contracts/}: Solidity contracts.
+    \item \texttt{circuits/}: Circom circuits for Groth16 proofs.
+    \item \texttt{frontend/}: voter and admin pages.
+    \item \texttt{crypto/}: Python ElGamal implementation.
+    \item \texttt{test/}: Hardhat integration tests.
+    \item \texttt{tests/}: Python unit tests.
+\end{itemize}
+
+\section{Dependency Installation}
+\begin{verbatim}
+npm install
+pip install -r requirements.txt
+\end{verbatim}
+
+\section{Local Development Run}
+A standard local run uses three terminals:
+\begin{verbatim}
+# Terminal 1
+npx hardhat node
+
+# Terminal 2
+npx hardhat run scripts/deploy-local.js --network localhost
+
+# Terminal 3
+python -m uvicorn server:app --port 8000
+\end{verbatim}
+
+Then open:
+\begin{itemize}
+    \item Voter page: \texttt{http://localhost:8000/}
+    \item Admin page: \texttt{http://localhost:8000/admin}
+\end{itemize}
+
+\section{Test Execution}
+Run both verification suites:
+\begin{verbatim}
+npx hardhat test
+python -m pytest tests/ -q
+\end{verbatim}
+
+\section{End-to-End Demo Script}
+\begin{enumerate}
+    \item On admin page: add $N$ candidates (recommended $N=3$ for current proof artifacts).
+    \item Register voter addresses.
+    \item Start election.
+    \item On voter page: connect wallet, select candidate, submit vote. Repeat for multiple voters.
+    \item On admin page: end election.
+    \item Load administrator secret key, run tally procedure, submit tally with ZKP3.
+    \item Export \texttt{audit\_bundle.json}.
+    \item On voter page: paste receipt JSON and audit bundle JSON, run anonymous verification.
+\end{enumerate}
+
+\section{Expected Artifacts}
+A successful run produces:
+\begin{itemize}
+    \item vote transactions with \texttt{EncryptedVoteCast} events;
+    \item a final tally transaction;
+    \item \texttt{audit\_bundle.json} containing Merkle root and proofs;
+    \item successful inclusion verification on voter side.
+\end{itemize}
 
 \endgroup

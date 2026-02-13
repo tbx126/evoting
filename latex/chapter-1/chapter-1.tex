@@ -7,33 +7,93 @@
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
 
-This chapter \lipsum[1]
+Electronic voting has long been positioned as a modernization path for democratic processes, especially in scenarios requiring rapid tallying, remote participation, and auditable outcomes. Yet, real deployment remains difficult because election systems must satisfy several properties that are usually in tension: confidentiality of individual ballots, integrity of election state transitions, universal verifiability of counting logic, and practical usability for both administrators and voters.
 
-\section{Motivations}
+Traditional centralized e-voting platforms often satisfy usability and operational speed, but they rely on a trusted operator to maintain backend logs, enforce state transitions, and publish correct tally outputs. In this trust model, independent verification by voters and third-party auditors is limited by what the operator chooses to expose. Once the system is disputed, root-cause analysis frequently depends on privileged data access rather than protocol-level guarantees.
 
-This thesis deals with the problem of the blind multiuser detection for DS-CDMA. This thesis deals with the problem of the blind multiuser detection for DS-CDMA...
+This dissertation studies a concrete alternative: a blockchain-based e-voting architecture that combines on-chain state-machine enforcement with privacy-preserving cryptography. The project integrates homomorphic ElGamal encryption, Groth16 zero-knowledge proof verification, and commitment-based Merkle inclusion proofs into one end-to-end pipeline. The goal is not merely theoretical correctness, but an implementation that can be executed, tested, and reviewed as a working engineering artifact.
 
-\begin{equation}
-J_{4\times 6} = \left[\dot{p}^{(1)},\, \dot{p}^{(2)},\, \dots,\, \dot{p}^{(6)}\right]
-\end{equation}
+\section{Problem Statement}
 
-\lipsum[1-2]
+The central problem is how to construct a voting protocol that supports all of the following in a deployable system:
+\begin{itemize}
+    \item ballot confidentiality during submission, storage, and tally;
+    \item correctness checks for vote formation and tally claims without revealing vote contents;
+    \item tamper-evident election lifecycle management;
+    \item voter-side verification that does not require disclosing identity or wallet address.
+\end{itemize}
 
-\section{Objectives and Scope}
+In formal terms, let $V$ denote the number of cast ballots and $N$ denote the number of candidates. The protocol must ensure that each accepted ballot encodes exactly one valid candidate choice, aggregate ciphertexts can be tallied consistently, and the published result vector is accompanied by cryptographic evidence sufficient for independent validation.
 
-The communication channel considered in this thesis is assumed to be slow time-varying. \lipsum[1]
+\section{Motivation}
 
-Wireless communication is evolving rapidly \cite{jordan2002,padgett1995}.
+Three observations motivate this work.
 
-\section{Organisation}
+First, blockchain ledgers provide append-only event logs and deterministic contract execution semantics, reducing the attack surface for silent state rewrites \cite{nakamoto2008,wood2014}. Second, modern zk-SNARK systems provide practical proof sizes and on-chain verification costs compatible with smart-contract workflows \cite{groth2016}. Third, circuit-friendly hash functions and Merkle structures enable lightweight post-election inclusion checks for large ballot sets \cite{poseidon2019,merkle1988}.
 
-\lipsum[1-2]
+The combination of these properties suggests a practical design space where privacy and verifiability can be treated as co-equal requirements rather than trade-offs resolved by institutional trust.
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.6\textwidth]{assets/figures/demo.png}
-    \caption{Proposed CMCN architecture}
-    \label{fig:cmcn}
-\end{figure}
+\section{Research Objectives}
+
+This dissertation has five concrete objectives:
+\begin{enumerate}
+    \item design a contract-level election state machine with explicit lifecycle constraints;
+    \item implement private ballot casting using one-hot ElGamal encryption on BabyJubJub;
+    \item enforce vote legality and tally correctness through Groth16 proof verification;
+    \item implement an anonymous voter audit path through commitment receipts and Merkle proofs;
+    \item evaluate requirement completion against the project brief and identify remaining hardening gaps.
+\end{enumerate}
+
+\section{Research Questions}
+
+The implementation and evaluation are organized around the following questions:
+\begin{itemize}
+    \item \textbf{RQ1}: Can encrypted one-hot ballots and ZKP-based checks be integrated into a browser-to-chain workflow without trusted middleware?
+    \item \textbf{RQ2}: Does the resulting pipeline provide verifiability that is stronger than centralized log-based auditing?
+    \item \textbf{RQ3}: Which security guarantees are already achieved in code, and which remain partially satisfied due to engineering gaps?
+\end{itemize}
+
+Table \ref{tab:rq-mapping} maps each research question to the main validation locus in this dissertation.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Research Question to Validation Mapping}
+\label{tab:rq-mapping}
+\begin{tabular}{L{2.0cm} L{5.0cm} L{5.8cm}}
+\toprule
+RQ & Evaluation Focus & Primary Evidence Location \\
+\midrule
+RQ1 & End-to-end integration feasibility of client crypto, proof generation, and contract verification & Chapter 4 implementation workflow and Chapter 5 scenario validation \\
+RQ2 & Comparative verifiability gain over centralized e-voting & Chapter 2 positioning and Chapter 5 security analysis \\
+RQ3 & Gap analysis between functional completion and high-assurance completion & Chapter 5 outstanding gaps and Appendix B checklist \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Scope and Boundaries}
+
+The implemented system targets a single-election deployment model with an administrator-controlled tally key. The solution is designed as a high-confidence prototype and research demonstrator, not a production-national-election platform.
+
+Out-of-scope items include coercion resistance, threshold decryption ceremonies, decentralized governance for election administration, and formal verification of contract bytecode. These are addressed as future work rather than claimed as completed features.
+
+\section{Contributions}
+
+This dissertation contributes the following:
+\begin{itemize}
+    \item an executable cross-stack architecture connecting Solidity contracts, Circom circuits, JavaScript frontend proving, and Python cryptographic validation;
+    \item a vote-submission mechanism that binds commitment and ciphertext hash into public proof signals;
+    \item a tally pipeline that integrates homomorphic aggregation, ZKP3 verification, and Merkle-root publication;
+    \item an anonymous verification procedure in which the voter proves ballot inclusion using only receipt material and an exported audit bundle;
+    \item a requirement-driven completion assessment with explicit unresolved risks.
+\end{itemize}
+
+\section{Dissertation Structure}
+
+Chapter 2 reviews prior work and cryptographic foundations. Chapter 3 defines the system model, protocol flow, and security assumptions. Chapter 4 details implementation decisions and module-level behavior. Chapter 5 reports evaluation outcomes, requirement traceability, and risk analysis. Chapter 6 concludes and proposes a prioritized hardening roadmap.
+
+\section{Chapter Summary}
+
+This chapter established the dissertation problem context, defined explicit research questions, and set realistic scope boundaries for interpreting security claims. It also introduced contribution statements that are later validated against implementation and evaluation evidence.
 
 \endgroup

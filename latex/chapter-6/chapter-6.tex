@@ -10,19 +10,64 @@
 
 \section{Conclusions}
 
-\begin{table}[h]
-    \centering
-    \caption{Example Table Title}
-    \label{tab:example}
-    \begin{tabular}{|c|c|c|}
-        \hline
-        Column 1 & Column 2 & Column 3 \\ \hline
-        Data 1   & Data 2   & Data 3   \\ \hline
-        Data 4   & Data 5   & Data 6   \\ \hline
-        Data 7   & Data 8   & Data 9   \\ \hline
-    \end{tabular}
+This dissertation implemented a blockchain-based e-voting system that integrates (i) homomorphic encryption for confidential ballots, (ii) Groth16 zero-knowledge proofs for vote and tally correctness, and (iii) commitment-based Merkle auditability for anonymous voter-side inclusion checks.
+
+The principal engineering result is that a working pipeline can be built using mainstream Ethereum tooling and open-source ZKP frameworks, while preserving key security properties at the protocol layer. Votes are validated on-chain via proof verification; tally claims are accompanied by decryption correctness proofs; and voters can verify inclusion using local receipts without address-based lookup.
+
+From a requirement standpoint, the prototype satisfies the core functional requirements of confidentiality and verifiability. At the same time, code review reveals several hardening gaps that must be addressed before describing the system as production-ready. These gaps are explicitly documented to ensure the dissertation reports security claims conservatively and accurately.
+
+\section{Completion Assessment Against Project Statement}
+
+Against the stated project goal (``a fully functional e-voting system with verifiability and voter privacy''), the current status can be summarized as follows:
+\begin{itemize}
+    \item \textbf{Functional prototype objective}: achieved. The end-to-end election workflow executes with verifiable vote and tally proofs plus commitment-based inclusion audit.
+    \item \textbf{Research comparison objective}: achieved. The dissertation analyzes integrity, transparency, and tamper resistance relative to centralized baselines.
+    \item \textbf{High-assurance production objective}: not yet achieved. Remaining hardening tasks are explicit and technically scoped.
+\end{itemize}
+
+This assessment keeps the claim boundary precise: complete as a demonstrator and dissertation artifact, incomplete as a production election platform.
+
+\section{Limitations}
+
+The current system has the following limitations:
+\begin{itemize}
+    \item administrator key custody is a central operational trust assumption;
+    \item circuit configuration is fixed for a specific candidate count in current artifacts;
+    \item some bindings between on-chain public signals and off-chain payloads require reinforcement;
+    \item coercion resistance and strong endpoint security are outside scope.
+\end{itemize}
+
+\section{Future Work}
+
+The following roadmap is prioritized for completing remaining tasks:
+\begin{enumerate}
+    \item \textbf{Strict binding of tally results}: bind the submitted result vector to the public signals verified by Groth16 to prevent inconsistent reporting.
+    \item \textbf{Encrypted payload integrity}: compute and enforce ciphertext hash binding to emitted payloads or redesign tally ingestion to avoid relying on mutable sources.
+    \item \textbf{Root authenticity checks}: compare audit bundle root to on-chain \texttt{merkleRoot} in the voter verification flow.
+    \item \textbf{Candidate-count alignment}: enforce candidate count constraints at contract level or support per-election circuit generation and verifier deployment.
+    \item \textbf{Governance hardening}: lifecycle-gate or remove unrestricted Merkle-root overwrite functions.
+    \item \textbf{Decentralized key management}: introduce threshold encryption/decryption or multi-party custody to reduce single-admin trust.
+    \item \textbf{Coercion resistance research}: explore receipt-freeness mechanisms and stronger threat models.
+\end{enumerate}
+
+Table \ref{tab:roadmap-phases} converts the future-work list into phased engineering milestones.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Phased Hardening Roadmap}
+\label{tab:roadmap-phases}
+\begin{tabular}{L{2.2cm} L{4.6cm} L{4.8cm}}
+\toprule
+Phase & Priority Deliverables & Expected Outcome \\
+\midrule
+Near-term & Result-vector/public-signal binding, bundle-root vs on-chain-root check, event payload integrity checks & Close critical correctness gaps and strengthen trust in audit outputs \\
+Mid-term & Candidate-count/circuit alignment, lifecycle-gated Merkle root governance, deployment hardening & Reduce misuse risk and improve operational robustness \\
+Long-term & Threshold key management, coercion-resistance mechanisms, formal verification extensions & Move from prototype assurance toward high-assurance production viability \\
+\bottomrule
+\end{tabular}
 \end{table}
 
-\section{Recommendation in Future Work}
+Overall, the project is complete as a functional prototype demonstrating verifiable and privacy-aware blockchain voting, with a clear set of engineering steps required for full high-assurance completion.
 
 \endgroup

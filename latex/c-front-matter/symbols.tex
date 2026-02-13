@@ -1,14 +1,16 @@
-\chapter*{Symbols (optional)}
-\addcontentsline{toc}{chapter}{Symbols (optional)}
+\chapter*{Symbols}
+\addcontentsline{toc}{chapter}{Symbols}
 
 \noindent
-\begin{tabular}{ll} % 两列对齐
-B & channel bandwidth in Hz \\
-C & channel capacity in bps; \\
-  & number of collisions in time slot $t$ \\
-d & distance \\
-D & minimum reuse distance \\
-$D_a$ & average message access delay \\
-$D_{id}$ & inter-datagram-arrival time \\
-$D_{max}$ & maximum tolerable delay for voice packets \\
+\begin{tabular}{ll}
+$N$ & Number of candidates \\
+$V$ & Number of cast votes \\
+$v$ & Chosen candidate index \\
+$s$ & Random salt used in commitment \\
+$Com$ & Ballot commitment, $Poseidon(v,s)$ \\
+$H_{ct}$ & Ciphertext binding hash \\
+$pk$ & ElGamal public key \\
+$sk$ & ElGamal secret key \\
+$C1, C2$ & ElGamal ciphertext points \\
+$R$ & Merkle root of all commitments \\
 \end{tabular}

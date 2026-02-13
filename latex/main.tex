@@ -1,55 +1,57 @@
 \documentclass[12pt,a4paper]{report}
 
-% ============================ 预加载的 LaTeX 包 ============================
-\usepackage[a4paper,left=3.5cm,right=3cm,top=3cm,bottom=3cm]{geometry} % 页面边距
-\usepackage[protrusion=true,expansion=true]{microtype}  % 细节优化
-\usepackage{setspace}                         % 设置 1.5 倍行距
-\usepackage{fancyhdr}                         % 自定义页眉页脚
-\usepackage{newtxtext,newtxmath}              % 设置 Times New Roman 字体
-\usepackage{amsmath, amssymb, amsthm}         % 数学支持
-\usepackage{graphicx}                         % 插入图片
-\usepackage{hyperref}                         % 目录超链接
-\usepackage{booktabs}                         % 美化表格
-\usepackage{array}                            % 处理表格对齐
-\usepackage{multicol}                         % 多列布局
-\usepackage[toc,page]{appendix}               % 处理附录
-\usepackage[nottoc]{tocbibind}  % 让目录中包含“参考文献”和“附录”
-\usepackage{caption}                          % 处理表格和图片标题格式
-\usepackage{xcolor}                           % 颜色支持
-\usepackage{titlesec}                         % 控制标题字体大小
-\usepackage{eso-pic}                          % 添加水印
-\usepackage{tikz}                             % 让水印精确定位
-\usepackage{datetime}                         % 格式化日期
-\usepackage{tocloft}                          % 目录格式控制
-\usepackage{titlesec}                         % 标题格式控制
-\usepackage{titletoc}                         % 目录格式增强
-\usepackage{cite}                             % bib引用
-\usepackage{lipsum}                           % 内容模拟
+% ============================ LaTeX Packages ============================
+\usepackage[a4paper,left=3.5cm,right=3cm,top=3cm,bottom=3cm]{geometry} % page margins
+\usepackage[protrusion=true,nopatch=footnote]{microtype} % micro-typographic refinements
+\usepackage{setspace}                         % line spacing
+\usepackage{fancyhdr}                         % custom header/footer
+\usepackage{newtxtext,newtxmath}              % Times New Roman font
+% amsmath, amssymb, amsthm are already loaded by newtxmath
+\usepackage{graphicx}                         % images
+\usepackage{hyperref}                         % hyperlinks in TOC
+\usepackage{booktabs}                         % professional tables
+\usepackage{array}                            % table alignment
+\usepackage{tabularx}                         % adaptive-width tables
+\usepackage{multicol}                         % multi-column layout
+\usepackage[toc,page]{appendix}               % appendix handling
+\usepackage[nottoc]{tocbibind}                % include References in TOC
+\usepackage{caption}                          % caption formatting
+\usepackage{xcolor}                           % colour support
+\usepackage{titlesec}                         % heading font control
+\usepackage{eso-pic}                          % watermark
+\usepackage{tikz}                             % precise watermark positioning
+\usepackage{datetime}                         % date formatting
+\usepackage{tocloft}                          % TOC formatting
+% titlesec already loaded above
+\usepackage{titletoc}                         % enhanced TOC formatting
+\usepackage{cite}                             % bibtex citation
+% \usepackage{lipsum}                         % filler text (unused)
 % \usepackage{showframe}
 \usepackage{etoolbox}
 \usepackage{ragged2e}
+\newcolumntype{L}[1]{>{\RaggedRight\arraybackslash}p{#1}}
 
-% ================================= 设置公式 ================================
-\AtBeginEnvironment{equation}{\setstretch{1}}             % 设置公式1倍行距
-\AtEndEnvironment{equation}{}                             % 公式结束恢复原样式
-\numberwithin{equation}{section}                          % 让公式编号跟随章节
-\renewcommand{\theequation}{\arabic{section}.\arabic{equation}}% 仅显示1.1
+% ================================= Equations ================================
+\AtBeginEnvironment{equation}{\setstretch{1}}             % single spacing for equations
+\AtEndEnvironment{equation}{}                             % restore after equation
+\numberwithin{equation}{section}                          % equation numbering follows section
+\renewcommand{\theequation}{\arabic{section}.\arabic{equation}}% display as 1.1
 
-% ================================= 设置页脚 ================================
-\pagestyle{fancy}                                         % 启用 fancyhdr
-\fancyhf{}                                                % 清除默认的页眉和页脚
-\fancyfoot[R]{\fontsize{12pt}{14pt}\selectfont \thepage}  % 右侧页脚页码 12pt
-\renewcommand{\headrulewidth}{0pt}                        % 取消页眉下划线
-\renewcommand{\footrulewidth}{0pt}                        % 取消页脚下划线
-\fancypagestyle{plain}{                                   % 适配plain风格页面
+% ================================= Footer ================================
+\pagestyle{fancy}                                         % enable fancyhdr
+\fancyhf{}                                                % clear defaults
+\fancyfoot[R]{\fontsize{12pt}{14pt}\selectfont \thepage}  % right footer page number 12pt
+\renewcommand{\headrulewidth}{0pt}                        % no header rule
+\renewcommand{\footrulewidth}{0pt}                        % no footer rule
+\fancypagestyle{plain}{                                   % plain page style
     \fancyhf{} 
     \fancyfoot[R]{\fontsize{12pt}{14pt}\selectfont \thepage}
     \renewcommand{\headrulewidth}{0pt}
     \renewcommand{\footrulewidth}{0pt}
 }
 
-% ================================= 设置目录 ================================
-% 修改目录标题格式（居中 + 18pt + 加粗 + 下划线）
+% ================================= TOC ================================
+% TOC title format (centered + 18pt + bold + underline)
 \renewcommand{\contentsname}{}
 \newcommand{\customtoc}{
     \clearpage
@@ -58,56 +60,57 @@
     \end{center}
     \vspace{-1.2\baselineskip}
 }
-% 自定义 "Pages" 列标题，使其右对齐
+% Custom "Pages" column header, right-aligned
 \renewcommand{\cftaftertoctitle}{%
-    \vspace{-1.5\baselineskip} % 减少 Table of Contents 后的额外空行
-    \hfill\underline{Pages} % 右对齐
-    \par\vskip-2\baselineskip % 调整间距，防止错位
+    \vspace{-1.5\baselineskip} % reduce space after Table of Contents
+    \hfill\underline{Pages} % right-aligned
+    \par\vskip-2\baselineskip % adjust spacing
 }
-%目录格式调整
-% 一级标题 (chapter) 设置
-\renewcommand{\cftchapfont}{\bfseries}                  % 章节标题加粗
-\renewcommand\thechapter{Chapter\enspace\arabic{chapter}}       % 添加 "Chapter " 前缀
-\renewcommand\thesection{\arabic{chapter}.\arabic{section}} % 解决上行代码的乱码问题
-\renewcommand{\cftchapaftersnumb}{}                     % 章节编号后不添加任何内容
-\setlength{\cftchapnumwidth}{5.3em}                       % 设置编号宽度
-% 二级标题（section）设置
-\renewcommand{\cftsecfont}{}                            % 节标题字体
-\renewcommand{\cftsecpresnum}{}                         % 节编号前缀
-\renewcommand{\cftsecaftersnumb}{}                      % 节编号后缀
-\setlength{\cftsecindent}{0em}                          % 节的缩进
-\setlength{\cftsecnumwidth}{2em}                        % 节编号宽度
-\renewcommand{\cftsecdotsep}{\cftnodots}                % 移除点线
-\renewcommand{\cftsecpagefont}{\color{white}}        % 移除页码
-% 间距设置
-\setlength{\cftbeforechapskip}{0.5em}                   % 章节前的间距
-\setlength{\cftbeforesecskip}{0.5em}                    % 节前的间距
+% TOC formatting
+% Chapter level
+\renewcommand{\cftchapfont}{\bfseries}                  % bold chapter titles
+\renewcommand\thechapter{\arabic{chapter}}       % chapter number only
+\renewcommand\thesection{\arabic{chapter}.\arabic{section}} % fix section numbering
+\renewcommand{\cftchappresnum}{Chapter\enspace}   % "Chapter " prefix in TOC
+\renewcommand{\cftchapaftersnumb}{}                     % nothing after chapter number
+\setlength{\cftchapnumwidth}{7.3em}                       % chapter number width
+% Section level
+\renewcommand{\cftsecfont}{}                            % section font
+\renewcommand{\cftsecpresnum}{}                         % section number prefix
+\renewcommand{\cftsecaftersnumb}{}                      % section number suffix
+\setlength{\cftsecindent}{0em}                          % section indent
+\setlength{\cftsecnumwidth}{2em}                        % section number width
+\renewcommand{\cftsecdotsep}{\cftnodots}                % remove dot leaders
+\renewcommand{\cftsecpagefont}{\color{white}}        % hide page numbers
+% Spacing
+\setlength{\cftbeforechapskip}{0.5em}                   % space before chapter
+\setlength{\cftbeforesecskip}{0.5em}                    % space before section
 
-% ========================== 统一设置 \chapter ==========================
-% 设置有编号的 \chapter 显示 "Chapter 1" + 换行后的标题左对齐
-\titleformat{\chapter}[display]            % "Chapter 1" 独立一行，标题换行后左对齐
-  {\normalfont\Huge\bfseries}  % 不倾斜，字号 Huge，加粗
-  {\thechapter}                            % 显示 "Chapter 1"
-  {0em}                                    % 章节编号和标题之间的间距
-  {\raggedright}                           % 标题居左
-% 设置无编号的 \chapter*{}（如摘要、附录等）格式，不带 "Chapter"
+% ========================== Chapter formatting ==========================
+% Numbered \chapter: "Chapter 1" on its own line, title left-aligned below
+\titleformat{\chapter}[display]            % "Chapter 1" on separate line
+  {\normalfont\Huge\bfseries}  % Huge, bold
+  {Chapter\enspace\thechapter}             % shows "Chapter 1"
+  {0em}                                    % space between number and title
+  {\raggedright}                           % title left-aligned
+% Unnumbered \chapter* (Abstract, Appendices, etc.)
 \titleformat{name=\chapter,numberless}[display]
-  {\normalfont\Huge\bfseries}  % 不倾斜，字号 Huge，加粗
-  {}                                       % 无编号时不显示 "Chapter 1"
-  {-2.5em}                                 % 章节编号和标题之间的间距
-  {\centering}                             % 标题居中
-% 调整章节标题的间距
-\titlespacing{\chapter}{0pt}{-2em}{0em}  % 影响有编号的章节
-\titlespacing{name=\chapter,numberless}{0pt}{0em}{\baselineskip}  % 影响无编号的章节
+  {\normalfont\Huge\bfseries}  % Huge, bold
+  {}                                       % no number
+  {-2.5em}                                 % space between number and title
+  {\centering}                             % title centered
+% Chapter spacing
+\titlespacing{\chapter}{0pt}{-2em}{0em}  % numbered chapters
+\titlespacing{name=\chapter,numberless}{0pt}{0em}{\baselineskip}  % unnumbered chapters
 
-% ========================== 统一设置 \section ==========================
-% 设置有编号的 \section{}
-\titleformat{\section}                        % 统一设置 section
-  {\normalfont\fontsize{16pt}{16pt}\bfseries} % 12pt 字号行距，加粗
-  {\thesection\enspace}                       % 章节编号（这里为空）
-  {0pt}                                       % 章节前间距
-  {\raggedright}                              % 章节后格式（这里保持默认）
-% 设置无编号的 \section*{}
+% ========================== Section formatting ==========================
+% Numbered \section
+\titleformat{\section}                        % section formatting
+  {\normalfont\fontsize{16pt}{16pt}\bfseries} % 16pt bold
+  {\thesection\enspace}                       % section number
+  {0pt}                                       % before-title space
+  {\raggedright}                              % left-aligned
+% Unnumbered \section*
 \titleformat{name=\section,numberless}[display]
   {\clearpage\normalfont\fontsize{16pt}{16pt}\bfseries}
   {}
@@ -116,55 +119,66 @@
 \titlespacing{\section}{0pt}{0.5\baselineskip}{0.5\baselineskip}
 \titlespacing{name=\section,numberless}{0pt}{0em}{1.5\baselineskip}
 
-\global\sloppy  % 允许换行，减少溢出
+\global\sloppy  % allow loose line breaking
+\hbadness=10000 % suppress underfull hbox warnings
+\vbadness=10000 % suppress underfull vbox warnings
+\hfuzz=2pt      % ignore tiny overfull boxes
 
-% ======================= 统一设置 \subsection ========================
-% 设置有编号的 \subsection{}
+% ======================= Subsection formatting ========================
+% Numbered \subsection
 \titleformat{\subsection}    
-  {\normalfont\fontsize{14pt}{14pt}\bfseries}  % 14pt 字号行距，加粗
-  {\thesubsection\enspace}                     % 章节编号
-  {0pt}                                        % 章节编号与标题间距
-  {\raggedright}                               % 标题左对齐
+  {\normalfont\fontsize{14pt}{14pt}\bfseries}  % 14pt bold
+  {\thesubsection\enspace}                     % subsection number
+  {0pt}                                        % before-title space
+  {\raggedright}                               % left-aligned
 
-% 调整 subsection 的间距
+% Subsection spacing
 \titlespacing{\subsection}{0pt}{0.5\baselineskip}{0.5\baselineskip}
 
 
 \begin{document}
 
-\onehalfspacing % 1.5 倍行距
+\onehalfspacing % 1.5x line spacing
 
-% ================================ 自定义颜色 ================================
+% ================================ Custom colours ================================
 \definecolor{DeepGreen}{rgb}{0.0, 0.690, 0.314}
 
-% ================================ 自定义设置 ================================
-% 左缩进为0
+% ================================ Custom settings ================================
+% No paragraph indent
 \setlength{\parindent}{0pt}
-% 自定义日期格式
+% Custom date format
 \newdateformat{mydate}{\THEDAY\ \monthname[\THEMONTH]\ \THEYEAR}
-% 让图编号显示为 "Figure X.Y"
-\renewcommand{\thefigure}{Figure \arabic{chapter}.\arabic{figure}}
+% Unified figure/table numbering and caption style
+\renewcommand{\thefigure}{\arabic{chapter}.\arabic{figure}}
 \setlength{\cftfignumwidth}{4.5em}
-\renewcommand{\figurename}{}
-% 调整 listoffigures (图目录) 的格式
+\renewcommand{\figurename}{Figure}
+\renewcommand{\thetable}{\arabic{chapter}.\arabic{table}}
+\setlength{\cfttabnumwidth}{4.5em}
+\renewcommand{\tablename}{Table}
+\captionsetup{
+    font=small,
+    labelfont=bf,
+    labelsep=period,
+    justification=centering,
+    singlelinecheck=false
+}
+\captionsetup[figure]{name=Figure}
+\captionsetup[table]{name=Table}
+% List of Figures formatting
 \makeatletter
 \renewcommand{\listoffigures}{%
     \begingroup
-    \vspace{-2em} % 减少上方间距
+    \vspace{-2em} % reduce top spacing
     \chapter*{\listfigurename}%
     \@starttoc{lof}%
     \endgroup
 }
 \makeatother
-% 让表格编号显示为 "Table X.Y"
-\renewcommand{\thetable}{Table \arabic{chapter}.\arabic{table}}
-\setlength{\cfttabnumwidth}{4.5em}
-\renewcommand{\tablename}{}
-% 调整 listoftables (表目录) 的格式
+% List of Tables formatting
 \makeatletter
 \renewcommand{\listoftables}{%
     \begingroup
-    \vspace{-2em} % 减少上方间距
+    \vspace{-2em} % reduce top spacing
     \chapter*{\listtablename}%
     \@starttoc{lot}%
     \endgroup
@@ -172,62 +186,54 @@
 \makeatother
 
 
-% ======================== 论文前置部分（Front Matter） =======================
+% ======================== Front Matter =======================
+\hypersetup{pageanchor=false}                  % avoid duplicate page anchors while page numbers are suppressed
 \pagenumbering{gobble}
-\input{c-front-matter/title-page}             % 论文封面
-\input{c-front-matter/originality}            % 原创性声明
-\input{c-front-matter/supervisor-declaration} % 导师声明
-\input{c-front-matter/authorship}             % 著作声明
+\input{c-front-matter/title-page}             % title page
+\input{c-front-matter/originality}            % originality statement
+\input{c-front-matter/supervisor-declaration} % supervisor declaration
+\input{c-front-matter/authorship}             % authorship statement
 
 \clearpage
 \centering\customtoc
-% \addtocontents{toc}{\protect\setcounter{tocdepth}{-1}} % 暂时隐藏目录 (This line causes empty TOC)
-\tableofcontents % 生成目录
-% \addtocontents{toc}{\protect\setcounter{tocdepth}{1}}  % 恢复目录
+% \addtocontents{toc}{\protect\setcounter{tocdepth}{-1}} % hide TOC (causes empty TOC)
+\tableofcontents % generate TOC
+% \addtocontents{toc}{\protect\setcounter{tocdepth}{1}}  % restore TOC
 \clearpage
 
 \clearpage
-\pagenumbering{roman}                         % 正文前使用罗马数字编号
-\setcounter{page}{1}                          % 从 i 开始
-\pagestyle{fancy}                             % 确保页码继续显示在右侧页脚
-\input{c-front-matter/abstract}               % 摘要
-\input{c-front-matter/acknowledgement}        % 致谢（可选）
-\input{c-front-matter/acronyms}               % 术语缩写表（可选）
-\input{c-front-matter/symbols}                % 符号表（可选）
-\listoffigures                                % 生成图目录
-\listoftables                                 % 生成表目录
+\pagenumbering{roman}                         % roman numerals for front matter
+\hypersetup{pageanchor=true}
+\setcounter{page}{1}                          % start from i
+\pagestyle{fancy}                             % keep page numbers in right footer
+\input{c-front-matter/abstract}               % abstract
+\input{c-front-matter/acknowledgement}        % acknowledgement (optional)
+\input{c-front-matter/acronyms}               % acronyms (optional)
+\input{c-front-matter/symbols}                % symbols (optional)
+\listoffigures                                % list of figures
+\listoftables                                 % list of tables
 
-% ========================= 论文正文部分（Main Content） ========================
+% ========================= Main Content ========================
 \clearpage
-\pagenumbering{arabic}       % 正文部分改为阿拉伯数字
-\setcounter{page}{1}         % 从 1 开始
-\pagestyle{fancy}            % 确保页码继续显示在右侧页脚
-\input{chapter-1/chapter-1}  % 第一章
-\input{chapter-2/chapter-2}  % 第二章
-\input{chapter-3/chapter-3}  % 第三章
-\input{chapter-4/chapter-4}  % 第四章
-\input{chapter-5/chapter-5}  % 第五章
-\input{chapter-6/chapter-6}  % 第六章
+\pagenumbering{arabic}       % arabic numerals for main content
+\setcounter{page}{1}         % start from 1
+\pagestyle{fancy}            % keep page numbers in right footer
+\input{chapter-1/chapter-1}  % Chapter 1
+\input{chapter-2/chapter-2}  % Chapter 2
+\input{chapter-3/chapter-3}  % Chapter 3
+\input{chapter-4/chapter-4}  % Chapter 4
+\input{chapter-5/chapter-5}  % Chapter 5
+\input{chapter-6/chapter-6}  % Chapter 6
 
-% ============================ 参考文献（References） ===========================
-% thebibliography管理References
-% 选此方式保留references.tex，删除references.bib
-% \begingroup
-% \renewcommand{\chapter}[2]{}  % 禁止 thebibliography 自动添加目录项
-% \endgroup
-% \renewcommand{\bibname}{References}
-% \input{c-back-matter/references}
-
-% bib格式管理References
-% 选此方式保留references.bib，删除references.tex
+% ============================ References ===========================
+% bib-based References management
 \renewcommand{\bibname}{References}
-% \renewcommand\bibsection{\chapter*{\makebox[\textwidth][l]{\bibname}}\addcontentsline{toc}{chapter}{\bibname}} % This command is undefined in report class and causes error
-\bibliographystyle{IEEEtran}             % 指定 IEEE 风格
-\bibliography{c-back-matter/references}  % 你的 .bib 文件（不带 .bib 扩展名）
+\bibliographystyle{IEEEtran}             % IEEE citation style
+\bibliography{c-back-matter/references}  % .bib file (without .bib extension)
 
-% ============================== 附录（Appendix） ==============================
+% ============================== Appendix ==============================
 \appendix
-\input{c-back-matter/appendix-a} % 附录 A
-\input{c-back-matter/appendix-b} % 附录 B
+\input{c-back-matter/appendix-a} % Appendix A
+\input{c-back-matter/appendix-b} % Appendix B
 
 \end{document}

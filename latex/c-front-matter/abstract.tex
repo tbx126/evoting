@@ -3,11 +3,13 @@
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
-\setstretch{2} % 设置为2的时候为word1.5倍行距
+\setstretch{2}
 \setlength{\parskip}{0.5\baselineskip}
 
-Multihop cellular networks (MCNs) incorporate wireless ad hoc networking into traditional single-hop cellular networks (SCNs) and thus they enjoy the flexibility of ad hoc networks, while preserving the benefit of using infrastructure of SCNs. In this Thesis, we study the resource allocation problems in MCNs.
+This dissertation presents the design and implementation of a blockchain-based electronic voting system with verifiability and voter privacy. The system integrates three cryptographic mechanisms in a single end-to-end workflow: homomorphic ElGamal encryption over BabyJubJub for confidential ballots, Groth16 zero-knowledge proofs for vote and tally correctness, and commitment-based Merkle proofs for anonymous post-election auditability.
 
-Multihop cellular networks (MCNs) incorporate wireless ad hoc networking into traditional single-hop cellular networks (SCNs) and thus they enjoy the flexibility of ad hoc networks, while preserving the benefit of using infrastructure of SCNs. In this Thesis, we study the resource allocation problems in MCNs.
+During vote casting, each voter encrypts a one-hot ballot vector, computes a commitment and ciphertext binding hash, and submits a proof that validates ballot legality and consistency without revealing the selected candidate. During tallying, encrypted ballots are homomorphically aggregated, decrypted totals are accompanied by a tally proof, and a Merkle root derived from on-chain commitments is published. Voters can then verify inclusion of their own ballot commitment using a local receipt and an exported audit bundle, without address-based lookup.
+
+Implementation uses Solidity, Hardhat, Circom, snarkjs, Python cryptographic modules, and browser-side JavaScript clients. Evaluation via automated tests confirms functional end-to-end behavior and reproducibility. Requirement analysis shows that core functional goals are achieved, while several hardening tasks remain for production readiness, including stronger result binding, root consistency checks, and candidate-cardinality alignment between circuits and contract logic.
 
 \endgroup

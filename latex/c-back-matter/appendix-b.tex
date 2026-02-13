@@ -1,5 +1,5 @@
-\chapter*{\makebox[\textwidth][l]{Appendix B (optional)}}
-\addcontentsline{toc}{chapter}{Appendix B (optional}
+\chapter*{\makebox[\textwidth][l]{Appendix B: Requirement Traceability and Acceptance Checklist}}
+\addcontentsline{toc}{chapter}{Appendix B: Requirement Traceability and Acceptance Checklist}
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
@@ -8,6 +8,52 @@
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
 
-\lipsum[1-2]
+\section{Project Requirement Mapping}
+This appendix maps key requirements to implementation artifacts:
+\begin{itemize}
+    \item Blockchain lifecycle control: \texttt{contracts/Voting.sol}
+    \item Voter registration and one-vote enforcement: \texttt{contracts/VoterRegistry.sol}
+    \item Vote proof verification: \texttt{circuits/vote\_proof.circom}, \texttt{contracts/VoteVerifier.sol}
+    \item Tally proof verification: \texttt{circuits/tally\_proof.circom}, \texttt{contracts/TallyVerifier.sol}
+    \item Anonymous receipt-based audit: \texttt{frontend/lib/audit.js}, \texttt{frontend/voting-app.html}
+\end{itemize}
+
+\section{Acceptance Checklist}
+Table \ref{tab:acceptance-checklist} provides a status-oriented completion view.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Acceptance Checklist with Evidence}
+\label{tab:acceptance-checklist}
+\begin{tabular}{L{5.0cm} L{2.1cm} L{4.9cm}}
+\toprule
+Checklist Item & Status & Evidence Anchor \\
+\midrule
+Administrator can add candidates and control election lifecycle & Completed & Contract lifecycle checks and Hardhat lifecycle tests (Chapter 4, Section 4.2; Chapter 5, Section 5.2). \\
+Only registered voters can vote and duplicate votes are rejected & Completed & Registry gating and one-vote tests (Chapter 4, Section 4.2; Chapter 5, Table \ref{tab:evaluation-scenarios}). \\
+Accepted vote requires a valid Groth16 vote proof & Completed & \texttt{castVote} verifier path and vote-proof tests (Chapter 3, Section 3.6; Chapter 5, Section 5.2). \\
+Encrypted vote events can be retrieved for tally aggregation & Completed & Admin workflow and end-to-end run validation (Chapter 4, Section 4.4; Chapter 5, Section 5.3). \\
+Homomorphic tally yields deterministic result vector for fixed input set & Completed & Python tally tests and integration run outputs (Chapter 4, Section 4.5; Chapter 5, Table \ref{tab:runtime-snapshot}). \\
+Tally finalization requires a valid Groth16 tally proof & Completed & \texttt{updateTallyResults} verification and negative tests (Chapter 3, Section 3.7; Chapter 5, Section 5.2). \\
+Merkle root is built deterministically from commitments & Completed & Commitment-leaf Merkle construction and proof verification tests (Chapter 3, Section 3.8; Chapter 5, Section 5.4). \\
+Admin exports \texttt{audit\_bundle.json}; voter verifies inclusion locally & Completed & Audit-bundle workflow and anonymous verification path (Chapter 4, Section 4.4; Chapter 5, Section 5.4). \\
+Verification avoids address-based lookup of vote records & Completed (operational) & Receipt-based verification design and implementation behavior (Chapter 3, Section 3.9; Chapter 5, Section 5.3). \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Open Issues and Hardening Tasks}
+The following tasks remain for full high-assurance completion:
+\begin{enumerate}
+    \item Bind the submitted integer result vector to the ZKP public signals validated by the tally proof.
+    \item Enforce ciphertext payload integrity binding between emitted events and on-chain ciphertext hash.
+    \item Compare audit bundle root with on-chain \texttt{merkleRoot} during voter verification.
+    \item Align candidate cardinality between circuits and contract logic.
+    \item Lifecycle-gate or remove unrestricted Merkle-root overwrite operation.
+\end{enumerate}
+
+\section{Interpretation}
+The system is complete as an end-to-end demonstrator and research prototype that satisfies core privacy and verifiability requirements. It is not yet complete as a hardened production election system due to the explicit open issues listed above.
 
 \endgroup

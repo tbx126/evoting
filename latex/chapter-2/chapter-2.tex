@@ -7,13 +7,91 @@
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
 
-\section{Traditional E-Voting Architecture}
-Conventional electronic voting systems usually rely on a centralized software stack for ballot submission, storage, and tallying. The practical advantage is deployment simplicity. The core limitation is trust concentration: integrity, availability, and auditability are coupled to one organization and one data pipeline. In this model, independent verification by voters and third parties is often constrained by platform-level access and log export policies.
+\section{Security Requirements of E-Voting}
 
-\section{Blockchain and Verifiable Voting}
-Blockchain-based voting systems move election-state transitions to smart contracts and expose immutable events for public inspection. This design improves transparency and tamper resistance of control flow. However, naive on-chain voting leaks ballot semantics. Therefore, confidentiality-preserving constructions are required to avoid replacing centralized trust with public privacy loss.
+A credible e-voting system is usually expected to satisfy at least four properties: eligibility control, ballot secrecy, integrity of counting, and auditability. Classical protocol literature further distinguishes between individual verifiability (a voter can verify inclusion), universal verifiability (any observer can verify tally consistency), and receipt-freeness/coercion resistance \cite{benaloh1987,chaum2004,juels2005}.
+
+In practical deployments, these requirements map to both cryptographic and operational controls. Cryptography can prove that certain relations hold, but it cannot by itself guarantee endpoint security, key governance, or anti-coercion behavior in uncontrolled environments. This distinction is critical when interpreting claims of ``secure voting''.
+
+\section{Centralized E-Voting Systems}
+
+Conventional centralized architectures typically implement the election lifecycle through web services and database transactions. Their strengths include mature tooling, low operational complexity, and straightforward incident response within one trust boundary. Their limitations include:
+\begin{itemize}
+    \item privileged insiders can alter records or logs if controls fail;
+    \item independent replay of state transitions is difficult without full data export;
+    \item dispute resolution depends on institutional trust and policy compliance.
+\end{itemize}
+
+These limitations motivate replacing trust-in-operator with trust-in-protocol where possible.
+
+\section{Blockchain-Based Voting Approaches}
+
+Blockchain infrastructures provide immutable append-only logs and deterministic execution rules \cite{nakamoto2008,wood2014}. For voting, this allows transparent publication of election state transitions and event traces. Smart contracts can enforce lifecycle invariants directly, reducing hidden backend behavior.
+
+However, blockchain transparency introduces a privacy challenge. If vote semantics are posted in plaintext or trivially reversible form, confidentiality is permanently compromised. Therefore, privacy-preserving blockchain voting must combine ledger transparency for control flow with cryptographic concealment for ballot content.
+
+\section{Homomorphic Encryption for Private Tally}
+
+ElGamal encryption on discrete-log groups supports additive homomorphism over encoded messages \cite{elgamal1985}. For voting, each ballot can be encoded as a one-hot vector; component-wise aggregation of ciphertexts yields encrypted candidate totals. Decrypting only the aggregates avoids exposing individual ballots.
+
+This pattern has two practical advantages in e-voting:
+\begin{itemize}
+    \item tallying cost is linear in vote count with simple point operations;
+    \item privacy is maintained as long as secret-key exposure and plaintext side channels are controlled.
+\end{itemize}
+
+A limitation is that tally decryption usually remains dependent on one key holder unless threshold schemes are added.
+
+\section{Zero-Knowledge Proofs in Voting}
+
+Modern zk-SNARK constructions allow concise proofs that arithmetic constraints are satisfied without revealing witness data. Groth16 is widely used in blockchain contexts because proof verification on-chain is efficient and proof size is constant \cite{groth2016}. Circom/snarkjs provides an implementation pipeline for circuit design, witness generation, and verifier artifact export \cite{circomdocs,snarkjs}.
+
+In this dissertation, two proof families are used:
+\begin{itemize}
+    \item vote proof: enforces ballot legality and commitment-ciphertext consistency;
+    \item tally proof: enforces decryption correctness and total-vote consistency.
+\end{itemize}
+
+The design objective is to prevent invalid ballots or fabricated tally claims from being accepted by contract logic.
+
+\section{Commitments, Hashing, and Merkle Auditability}
+
+Commitments provide a compact way to bind secret ballot metadata (candidate ID and salt) to a public value. Poseidon is selected as the commitment hash due to circuit efficiency \cite{poseidon2019}. For scalable auditability, commitments are organized into a Merkle tree, and inclusion is verified by logarithmic-size proofs \cite{merkle1988}.
+
+This structure supports a useful operational pattern: a voter can validate that their commitment appears in the audited set without revealing identity, and any third party can recompute the root from published entries if ordering rules are deterministic.
 
 \section{Positioning of This Work}
-This project combines three elements into one practical workflow: (i) homomorphic ElGamal encryption for confidential ballots, (ii) Groth16 proofs for vote and tally correctness checks, and (iii) commitment-based Merkle audit bundles for receipt-driven voter verification. The implementation goal is not only cryptographic privacy but also operational verifiability: a voter can verify inclusion using a local receipt and an exported audit bundle, without address-based lookup.
+
+Relative to prior studies, this project emphasizes implementation-level integration rather than only protocol specification. The dissertation focuses on the full engineering chain from browser-side proof generation to contract-level verification and post-election audit tooling.
+
+The contribution is therefore twofold:
+\begin{itemize}
+    \item a functional prototype that demonstrates these techniques working together;
+    \item a transparent assessment of which security goals are complete, partially complete, or still open.
+\end{itemize}
+
+Table \ref{tab:approach-comparison} summarizes the most relevant architectural tradeoffs for this dissertation.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Architectural Comparison Across Voting Approaches}
+\label{tab:approach-comparison}
+\begin{tabular}{L{3.0cm} L{2.9cm} L{2.9cm} L{3.9cm}}
+\toprule
+Criterion & Centralized E-Voting & Blockchain-Only Voting & This Work (Blockchain + HE + ZKP + Merkle) \\
+\midrule
+State transparency & Limited by operator logs & High for on-chain actions & High for control flow and published commitments \\
+Ballot confidentiality & Depends on backend policy & Usually weak if plaintext on-chain & Stronger via encrypted ballots and commitment receipts \\
+Tally verifiability & Operational trust heavy & Moderate unless cryptographic proofs added & High through explicit vote/tally proofs \\
+Voter-side inclusion check & Rare or account-linked & Possible but privacy-sensitive & Receipt-based anonymous Merkle inclusion workflow \\
+Operational complexity & Lower & Moderate & Higher, but with stronger assurance properties \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Chapter Summary}
+
+This chapter positioned the dissertation against prior e-voting approaches and clarified why combining blockchain transparency with privacy-preserving cryptography is necessary. The review also identified the central design tradeoff: increased implementation complexity in exchange for stronger verifiability and integrity guarantees.
 
 \endgroup
