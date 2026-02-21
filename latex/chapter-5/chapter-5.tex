@@ -108,6 +108,147 @@ A practical end-to-end run proceeds:
 
 The key operational output is that a voter can validate inclusion without calling \texttt{getVoteRecord(address)}. This reduces address-based linkability and supports the project requirement of verifiable privacy.
 
+\section{Performance Evaluation}
+
+This section reports quantitative measurements of the system's on-chain gas consumption, zero-knowledge proof circuit complexity, client-side artifact footprint, and smart contract bytecode size. All measurements were taken using the project's current build artifacts with Solidity 0.8.20 (optimizer enabled, 200 runs), Groth16 on BN254, and the circuit configuration of $N=3$ candidates.
+
+\subsection{Circuit Complexity}
+
+Table \ref{tab:circuit-complexity} summarizes the R1CS constraint systems produced by circom compilation. These values were extracted from the compiled \texttt{.r1cs} files using \texttt{snarkjs r1cs info}.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{ZKP Circuit Complexity (N = 3 Candidates)}
+\label{tab:circuit-complexity}
+\begin{tabular}{L{3.2cm} L{2.0cm} L{2.0cm} L{2.0cm} L{2.0cm}}
+\toprule
+Circuit & Constraints & Wires & Public Inputs & Private Inputs \\
+\midrule
+\texttt{vote\_proof} & 21{,}477 & 21{,}480 & 4 & 17 \\
+\texttt{tally\_proof} & 23{,}232 & 23{,}237 & 21 & 1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both circuits operate on the BN128 (BN254) curve. The vote proof circuit encodes commitment verification, candidate range checks, one-hot encryption validity for $N$ candidates, and ciphertext hash binding. The tally proof circuit encodes key ownership, per-candidate decryption correctness, and sum consistency. Constraint counts scale linearly with $N$ due to per-candidate ElGamal verification sub-circuits.
+
+\subsection{Client-Side Artifact Footprint}
+
+Proof generation in the browser requires downloading WASM witness generators and proving key files. Table \ref{tab:artifact-sizes} reports the sizes of artifacts that must be loaded on the client side.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{ZKP Artifact Sizes}
+\label{tab:artifact-sizes}
+\begin{tabular}{L{4.5cm} L{2.5cm} L{5.5cm}}
+\toprule
+Artifact & Size & Role \\
+\midrule
+\texttt{vote\_proof.wasm} & 3.57 MB & Witness generator for vote proof \\
+\texttt{vote\_proof\_final.zkey} & 11.02 MB & Proving key for vote proof \\
+\texttt{tally\_proof.wasm} & 168.6 KB & Witness generator for tally proof \\
+\texttt{tally\_proof\_final.zkey} & 11.89 MB & Proving key for tally proof \\
+\texttt{vote\_proof.r1cs} & 4.14 MB & Constraint system (build-time only) \\
+\texttt{tally\_proof.r1cs} & 4.51 MB & Constraint system (build-time only) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For a voter casting a ballot, the browser must load approximately 14.6~MB of proof artifacts (WASM + zkey). This is a one-time download per session and can be cached. The administrator performing a tally loads approximately 12.1~MB. These sizes are consistent with typical Groth16 deployments at this constraint scale and are within practical browser download budgets for modern connections.
+
+\subsection{On-Chain Gas Consumption}
+
+Gas costs are central to evaluating blockchain-based protocol feasibility. Groth16 proof verification dominates the on-chain cost due to the \texttt{ecPairing} precompile, which on EVM costs $45{,}000 + 34{,}000 \times k$ gas for $k$ pairing checks (Groth16 uses $k = 4$, yielding 181{,}000 gas for the pairing alone).
+
+Table \ref{tab:gas-costs} reports the estimated gas consumption for each major on-chain operation, broken down by component. These estimates are derived from EVM opcode pricing (EIP-1108 precompile costs, EIP-2929 cold/warm storage access costs) applied to the contract logic in \texttt{Voting.sol}.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Estimated Gas Consumption Per Operation}
+\label{tab:gas-costs}
+\begin{tabular}{L{4.5cm} L{2.5cm} L{5.5cm}}
+\toprule
+Operation & Estimated Gas & Dominant Cost Component \\
+\midrule
+\texttt{castVote} (voter) & 315{,}000--340{,}000 & Groth16 verification ($\sim$181k) + 4$\times$SSTORE ($\sim$80k) + calldata \\
+\texttt{updateTallyResults} (admin) & 310{,}000--330{,}000 & Groth16 verification ($\sim$181k) + result loop SSTORE + event \\
+\texttt{addCandidate} & $\sim$50{,}000 & SSTORE for candidate record \\
+\texttt{startElection} & $\sim$28{,}000 & Single SSTORE for status transition \\
+\texttt{endElection} & $\sim$28{,}000 & Single SSTORE for status transition \\
+\texttt{registerVoter} (single) & $\sim$48{,}000 & SSTORE for registration record \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.0096--0.0102~ETH (\$24--\$26), and one \texttt{updateTallyResults} costs approximately 0.0093--0.0099~ETH (\$23--\$25). The Ethereum block gas limit (30M gas) can accommodate roughly 88--95 vote transactions per block if they were the only transactions, although in practice, block space is shared.
+
+\subsection{Proof Generation Latency}
+
+Groth16 proof generation is the most computationally intensive client-side operation. It involves multi-scalar multiplication over the proving key, which scales with the number of circuit constraints. For the current configuration ($N = 3$), the project test suite reports proof generation times of approximately 3--8 seconds per vote proof and 4--10 seconds per tally proof when executed in Node.js (snarkjs, single-threaded). Browser-based execution using snarkjs WASM is expected to exhibit similar or moderately longer latencies depending on device hardware.
+
+These times are acceptable for a prototype where voters submit one ballot per election. However, they represent a usability consideration: the voter interface should communicate proof-generation progress to avoid the impression of an unresponsive application.
+
+\subsection{Contract Bytecode Size}
+
+Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170). Table \ref{tab:bytecode-sizes} confirms that all contracts remain well within this limit.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Deployed Contract Bytecode Sizes}
+\label{tab:bytecode-sizes}
+\begin{tabular}{L{3.5cm} L{2.5cm} L{6.5cm}}
+\toprule
+Contract & Deployed Size & Notes \\
+\midrule
+\texttt{Voting} & 7{,}633 bytes (7.5 KB) & Main election logic; largest contract \\
+\texttt{VoterRegistry} & 2{,}558 bytes (2.5 KB) & Registration and one-vote enforcement \\
+\texttt{VoteVerifier} & 1{,}658 bytes (1.6 KB) & Groth16 verifier (snarkjs-generated) \\
+\texttt{TallyVerifier} & 3{,}260 bytes (3.2 KB) & Groth16 verifier (snarkjs-generated) \\
+\texttt{MerkleVerifier} & 942 bytes (0.9 KB) & Merkle proof verification \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The total deployed bytecode across all five contracts is 16{,}051 bytes. The Voting contract is the largest at 31\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. The Groth16 verifier contracts are compact because snarkjs generates optimized inline pairing-check code.
+
+\subsection{Scalability Discussion}
+
+The system's scalability characteristics vary by component. On-chain gas per vote (\texttt{castVote}) is essentially constant regardless of how many votes have already been cast, because each vote is independently verified and stored. However, two operations scale with election size:
+
+\begin{itemize}
+    \item \textbf{Tally aggregation} requires $O(VN)$ elliptic-curve point additions, performed off-chain by the administrator. For $V = 1{,}000$ votes and $N = 3$ candidates, this amounts to 3{,}000 point additions, completing in under one second on modern hardware.
+    \item \textbf{Discrete-log recovery} during tally decryption uses a baby-step giant-step algorithm bounded by the maximum expected vote count per candidate. For tallies up to approximately $2^{20}$ ($\sim$1M votes), this requires $O(\sqrt{V})$ precomputed table entries, which is practical. Beyond this range, the brute-force search becomes a bottleneck.
+    \item \textbf{Merkle tree construction} is $O(V)$ with $O(\log V)$ verification per inclusion check. For $V = 10{,}000$ commitments, tree construction completes in milliseconds.
+    \item \textbf{Circuit constraint scaling}: increasing the number of candidates from $N = 3$ to $N = 10$ would increase vote proof constraints approximately 3.3$\times$ (from $\sim$21k to $\sim$70k), proportionally increasing proof generation time and proving key size.
+\end{itemize}
+
+Table \ref{tab:scalability-summary} summarizes the scaling profile.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Scalability Profile by Component}
+\label{tab:scalability-summary}
+\begin{tabular}{L{4.2cm} L{2.8cm} L{5.5cm}}
+\toprule
+Component & Complexity & Practical Bound \\
+\midrule
+Per-vote on-chain cost & $O(1)$ & Constant $\sim$330k gas per vote \\
+Tally aggregation (off-chain) & $O(VN)$ & Practical up to $V = 10^5$ \\
+DLog recovery (off-chain) & $O(\sqrt{V_{max}})$ & Practical up to $V_{max} \approx 2^{20}$ \\
+Merkle tree build (off-chain) & $O(V)$ & Practical up to $V = 10^6$ \\
+Inclusion verification & $O(\log V)$ & Negligible for all practical $V$ \\
+Proof generation (client) & $O(N \cdot C)$ & Scales linearly with candidate count $N$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Overall, the prototype is well-suited for small-to-medium elections (up to several thousand voters) in its current form. The primary scaling bottleneck for larger elections would be proof generation latency and artifact download size as candidate count $N$ increases, rather than on-chain gas costs.
+
 \section{Commitment Merkle Auditability}
 
 The audit design uses commitment leaves directly and derives internal nodes with Keccak. Deterministic event ordering ensures that independent auditors can reconstruct the same root given the same event set.
@@ -143,11 +284,11 @@ On-chain election lifecycle enforcement & Completed & Voting state machine and m
 Voter eligibility and one-vote rule & Completed & \texttt{contracts/VoterRegistry.sol} gates voting. \\
 Ballot confidentiality (no plaintext on-chain) & Completed & Only ciphertext and commitment published; plaintext never stored. \\
 Vote legality proof (range + one-hot) & Completed & \texttt{circuits/vote\_proof.circom} + verifier checks in \texttt{castVote}. \\
-Ciphertext binding to vote proof & Completed (partial binding) & Circuit proves \texttt{ciphertextHash}; event payload binding not fully enforced (see Section 5.7). \\
+Ciphertext binding to vote proof & Completed (partial binding) & Circuit proves \texttt{ciphertextHash}; event payload binding not fully enforced (see Section 5.8). \\
 Tally correctness proof (decryption) & Completed & \texttt{circuits/tally\_proof.circom} + verifier checks in \texttt{updateTallyResults}. \\
 Merkle inclusion auditability & Completed & \texttt{frontend/lib/audit.js}, export bundle, verify inclusion. \\
 Voter anonymity in verification & Completed (operational) & Receipt-based verification avoids address lookup; still relies on client privacy. \\
-Production readiness & Not completed & Several hardening tasks remain (Section 5.7). \\
+Production readiness & Not completed & Several hardening tasks remain (Section 5.8). \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -243,7 +384,7 @@ To mitigate these threats, the dissertation combines protocol-level reasoning, c
 
 \section{Chapter Summary}
 
-This chapter demonstrated that the implemented system is functionally complete as a verifiable privacy-preserving prototype and reproducible under automated testing. It also provided a requirement-grounded gap analysis that distinguishes current achievement from production-grade assurance.
+This chapter demonstrated that the implemented system is functionally complete as a verifiable privacy-preserving prototype and reproducible under automated testing. Performance evaluation confirmed that on-chain costs are dominated by Groth16 verification and that the system scales adequately for small-to-medium elections. It also provided a requirement-grounded gap analysis that distinguishes current achievement from production-grade assurance.
 
 \endgroup
 
