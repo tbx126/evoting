@@ -50,37 +50,26 @@ async function main() {
       break;
 
     case "cast-vote":
-      const candidateIdArg = args[1];
-      if (!candidateIdArg) {
-        console.log("用法: npx hardhat run scripts/interact.js --network sepolia -- cast-vote <候选人ID>");
-        console.log("  注: 现需 ZKP 证明，请使用 full-demo.js 进行完整投票流程");
-        return;
-      }
-      await castVoteZKP(voting, parseInt(candidateIdArg));
+      console.log("投票需在前端页面操作 (ZKP 由浏览器生成): http://localhost:8000/");
       break;
 
     case "end-election":
       await endElection(voting);
       break;
 
-    case "full-demo":
-      await fullDemo(voting, voterRegistry, admin);
-      break;
-
     default:
       console.log(`
 可用命令:
-  status          - 查看选举状态
-  add-candidates  - 添加候选人 (Alice, Bob, Charlie)
-  register-voter <地址> - 注册选民
-  start-election  - 启动选举
-  cast-vote <ID>  - 投票 (需 ZKP, 建议用 full-demo.js)
-  end-election    - 结束选举
-  full-demo       - 运行完整演示 (建议用 scripts/full-demo.js)
+  status                    - 查看选举状态
+  add-candidates            - 添加候选人 (张三, 李四)
+  register-voter <地址>     - 注册选民
+  start-election            - 启动选举
+  end-election              - 结束选举
+
+投票和计票请使用前端页面 (http://localhost:8000/)
 
 示例:
-  npx hardhat run scripts/interact.js --network sepolia -- status
-  npx hardhat run scripts/full-demo.js --network sepolia
+  npx hardhat run scripts/interact.js --network localhost -- status
       `);
   }
 }
@@ -117,7 +106,7 @@ async function showStatus(voting, voterRegistry) {
 async function addCandidates(voting) {
   console.log("\n添加候选人...");
 
-  const candidates = ["Alice", "Bob", "Charlie"];
+  const candidates = ["Alice", "Bob"];
   for (const name of candidates) {
     console.log(`  添加 ${name}...`);
     const tx = await voting.addCandidate(name);
@@ -150,67 +139,11 @@ async function startElection(voting) {
   console.log("✓ 选举已启动，选民现在可以投票");
 }
 
-async function castVoteZKP(voting, candidateId) {
-  console.log(`\n投票中 (ZKP)...`);
-  console.log(`  候选人 ID: ${candidateId}`);
-  console.log("  注: ZKP 投票需要 full-demo.js，此命令仅供参考");
-  console.log("  请运行: npx hardhat run scripts/full-demo.js --network sepolia");
-}
-
 async function endElection(voting) {
   console.log("\n结束选举...");
   const tx = await voting.endElection();
   await tx.wait();
   console.log("✓ 选举已结束");
-}
-
-async function fullDemo(voting, voterRegistry, admin) {
-  console.log("\n" + "=".repeat(60));
-  console.log("  完整投票演示");
-  console.log("=".repeat(60));
-
-  // 1. 检查当前状态
-  const info = await voting.getElectionInfo();
-  const currentStatus = Number(info._status);
-
-  // 2. 如果还没有候选人，添加候选人
-  if (Number(info._candidateCount) === 0) {
-    console.log("\n步骤 1: 添加候选人");
-    await addCandidates(voting);
-  } else {
-    console.log("\n步骤 1: 候选人已存在，跳过");
-  }
-
-  // 3. 注册当前账户为选民
-  console.log("\n步骤 2: 注册选民");
-  const isRegistered = await voterRegistry.isRegistered(admin.address);
-  if (!isRegistered) {
-    await registerVoter(voterRegistry, admin.address);
-  } else {
-    console.log("  当前账户已注册为选民");
-  }
-
-  // 4. 启动选举（如果还没启动）
-  if (currentStatus === 0) {
-    console.log("\n步骤 3: 启动选举");
-    await startElection(voting);
-  } else {
-    console.log("\n步骤 3: 选举已启动，跳过");
-  }
-
-  // 5. 投票 (需要 ZKP)
-  const hasVoted = await voterRegistry.hasVoted(admin.address);
-  if (!hasVoted && currentStatus <= 1) {
-    console.log("\n步骤 4: 投票 (ZKP)");
-    console.log("  注: ZKP 投票需要使用 scripts/full-demo.js");
-    console.log("  请运行: npx hardhat run scripts/full-demo.js --network sepolia");
-  } else if (hasVoted) {
-    console.log("\n步骤 4: 已投票，跳过");
-  }
-
-  // 6. 显示最终状态
-  console.log("\n" + "-".repeat(60));
-  await showStatus(voting, voterRegistry);
 }
 
 main()

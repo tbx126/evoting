@@ -113,5 +113,5 @@ template TallyProof(numCandidates) {
     sumY[numCandidates - 1] === tvG.out[1];
 }
 
-// Instantiate for 3 candidates (matching vote_proof)
-component main {public [pkX, pkY, c1TotalX, c1TotalY, c2TotalX, c2TotalY, resultPointX, resultPointY, totalVotes]} = TallyProof(3);
+// Instantiate for 2 candidates (matching vote_proof)
+component main {public [pkX, pkY, c1TotalX, c1TotalY, c2TotalX, c2TotalY, resultPointX, resultPointY, totalVotes]} = TallyProof(2);

@@ -88,5 +88,5 @@ template VoteProof(numCandidates) {
     ciphertextHash === ctHash.out;
 }
 
-// Instantiate for 3 candidates (default election size)
-component main {public [commitment, ciphertextHash, pkX, pkY]} = VoteProof(3);
+// Instantiate for 2 candidates
+component main {public [commitment, ciphertextHash, pkX, pkY]} = VoteProof(2);

@@ -38,7 +38,7 @@ if ! command -v circom &> /dev/null; then
 fi
 echo "  circom: $(circom --version)"
 
-if ! npx snarkjs --version &> /dev/null 2>&1; then
+if [ ! -d "$PROJECT_DIR/node_modules/snarkjs" ]; then
     echo "ERROR: snarkjs not found. Install with: npm install snarkjs"
     exit 1
 fi
@@ -170,4 +170,6 @@ echo ""
 echo "Next steps:"
 echo "  1. npx hardhat compile     # Compile Solidity contracts"
 echo "  2. npx hardhat test        # Run tests"
-echo "  3. npx hardhat run scripts/deploy.js --network sepolia  # Deploy"
+echo "  3. npx hardhat run scripts/deploy.js --network localhost  # Deploy"
+echo ""
+echo "Note: Re-run this script only if circuit .circom files are modified."

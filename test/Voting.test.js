@@ -21,7 +21,7 @@ const VOTE_ZKEY = path.join(__dirname, "../build/vote_proof_final.zkey");
 const TALLY_WASM = path.join(__dirname, "../build/tally_proof_js/tally_proof.wasm");
 const TALLY_ZKEY = path.join(__dirname, "../build/tally_proof_final.zkey");
 
-const NUM_CANDIDATES = 3;
+const NUM_CANDIDATES = 2;
 const ADMIN_SK = 12345678901234567890n;
 
 describe("区块链电子投票系统 (ZKP 版本)", function () {
@@ -337,7 +337,6 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
       beforeEach(async function () {
         await voting.addCandidate("Alice");
         await voting.addCandidate("Bob");
-        await voting.addCandidate("Charlie");
       });
 
       it("需要至少 2 个候选人才能开始选举", async function () {
@@ -368,7 +367,6 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
       beforeEach(async function () {
         await voting.addCandidate("Alice");
         await voting.addCandidate("Bob");
-        await voting.addCandidate("Charlie");
         await voting.startElection();
       });
 
@@ -435,7 +433,6 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
       beforeEach(async function () {
         await voting.addCandidate("Alice");
         await voting.addCandidate("Bob");
-        await voting.addCandidate("Charlie");
         await voting.startElection();
         await castRealVote(voter1, vote1Data);
         await castRealVote(voter2, vote2Data);
@@ -458,12 +455,10 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
         expect(alice.voteCount).to.equal(2);
         const bob = await voting.getCandidate(1);
         expect(bob.voteCount).to.equal(1);
-        const charlie = await voting.getCandidate(2);
-        expect(charlie.voteCount).to.equal(0);
       });
 
       it("计票结果总数必须匹配投票数", async function () {
-        const wrongResults = [1, 1, 0]; // Total 2, but 3 votes cast
+        const wrongResults = [1, 1]; // Total 2, but 3 votes cast
         const merkleRoot = ethers.keccak256(ethers.toUtf8Bytes("merkle"));
         await expect(
           voting.updateTallyResults(
@@ -490,7 +485,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
       it("ZKP3 公开输入中的 totalVotes 必须匹配", async function () {
         const merkleRoot = ethers.keccak256(ethers.toUtf8Bytes("merkle"));
         const badPubSignals = [...tallyData.pubSignals];
-        badPubSignals[20] = "999";
+        badPubSignals[14] = "999";
         await expect(
           voting.updateTallyResults(
             tallyData.results, merkleRoot,
@@ -516,19 +511,18 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
       beforeEach(async function () {
         await voting.addCandidate("Alice");
         await voting.addCandidate("Bob");
-        await voting.addCandidate("Charlie");
       });
 
       it("应该能获取所有候选人", async function () {
         const candidates = await voting.getAllCandidates();
-        expect(candidates.length).to.equal(3);
+        expect(candidates.length).to.equal(2);
         expect(candidates[0].name).to.equal("Alice");
       });
 
       it("应该能获取选举信息", async function () {
         const info = await voting.getElectionInfo();
         expect(info._title).to.equal("测试选举");
-        expect(info._candidateCount).to.equal(3);
+        expect(info._candidateCount).to.equal(2);
       });
 
       it("应该能获取 ElGamal 公钥", async function () {
@@ -569,7 +563,6 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
 
       await voting.addCandidate("Alice");
       await voting.addCandidate("Bob");
-      await voting.addCandidate("Charlie");
       await voting.startElection();
 
       await castRealVote(voter1, vote1Data);
@@ -591,10 +584,8 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
 
       const alice = await voting.getCandidate(0);
       const bob = await voting.getCandidate(1);
-      const charlie = await voting.getCandidate(2);
       expect(alice.voteCount).to.equal(2);
       expect(bob.voteCount).to.equal(1);
-      expect(charlie.voteCount).to.equal(0);
     });
   });
 });

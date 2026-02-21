@@ -723,16 +723,20 @@
             if (status === 'error') box.classList.add('error');
         }
 
+        function receiptKey() {
+            const electionId = AuditLib.electionKey(CONTRACT_CONFIG.NETWORK.chainId, VOTING_ADDRESS);
+            return `vote_receipt_${currentAccount}_${electionId}`;
+        }
+
         function loadLocalReceipt() {
             if (!currentAccount) {
                 addLog('Connect wallet first to load local receipt', 'warning');
                 return;
             }
-            const key = `vote_receipt_${currentAccount}`;
-            const data = localStorage.getItem(key);
+            const data = localStorage.getItem(receiptKey());
             if (!data) {
-                addLog('No local receipt found for this wallet', 'warning');
-                setVerifyResult('No local receipt found for this wallet.', 'error');
+                addLog('No local receipt found for this election', 'warning');
+                setVerifyResult('No local receipt found for this election.', 'error');
                 return;
             }
             document.getElementById('receiptInput').value = data;
@@ -886,10 +890,10 @@
                     addLog('使用配置中的 ElGamal 公钥', 'info');
                 }
 
-                const cachedReceipt = localStorage.getItem(`vote_receipt_${currentAccount}`);
+                const cachedReceipt = localStorage.getItem(receiptKey());
                 if (cachedReceipt) {
                     document.getElementById('receiptInput').value = cachedReceipt;
-                    addLog('Loaded local receipt for current wallet', 'info');
+                    addLog('Loaded local receipt for this election', 'info');
                 }
 
                 await loadElectionInfo();
@@ -1095,7 +1099,8 @@
                     electionId: AuditLib.electionKey(CONTRACT_CONFIG.NETWORK.chainId, VOTING_ADDRESS),
                     timestamp: Date.now()
                 };
-                localStorage.setItem(`vote_receipt_${currentAccount}`, JSON.stringify(voteReceipt));
+                localStorage.setItem(receiptKey(), JSON.stringify(voteReceipt));
+                document.getElementById('receiptInput').value = JSON.stringify(voteReceipt, null, 2);
                 addLog('投票凭证已保存到本地 (可用于事后验证)', 'info');
 
                 await loadElectionInfo();

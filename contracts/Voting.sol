@@ -30,7 +30,7 @@ interface ITallyVerifier {
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
-        uint[21] calldata _pubSignals
+        uint[15] calldata _pubSignals
     ) external view returns (bool);
 }
 
@@ -274,7 +274,7 @@ contract Voting {
      * @param _pA Groth16 proof point A (ZKP3)
      * @param _pB Groth16 proof point B (ZKP3)
      * @param _pC Groth16 proof point C (ZKP3)
-     * @param _tallyPubSignals ZKP3 公开输入 (21 个 uint256)
+     * @param _tallyPubSignals ZKP3 公开输入 (15 个 uint256)
      */
     function updateTallyResults(
         uint256[] calldata _results,
@@ -282,7 +282,7 @@ contract Voting {
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
-        uint[21] calldata _tallyPubSignals
+        uint[15] calldata _tallyPubSignals
     ) external onlyAdmin inStatus(ElectionStatus.Ended) {
         require(_results.length == candidateCount, "Voting: invalid results length");
 
@@ -291,7 +291,7 @@ contract Voting {
         require(_tallyPubSignals[1] == elgamalPK[1], "Voting: PK mismatch Y");
 
         // 2. 验证总票数 (公开输入最后一个是 totalVotes)
-        require(_tallyPubSignals[20] == totalVotes, "Voting: total votes mismatch");
+        require(_tallyPubSignals[14] == totalVotes, "Voting: total votes mismatch");
 
         // 3. 验证 ZKP3 证明 (解密正确性)
         require(

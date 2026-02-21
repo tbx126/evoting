@@ -1,267 +1,125 @@
 /**
- * 智能合约部署脚本 (ZKP 版本)
- * Deploy Script for E-Voting Smart Contracts with ZKP Verification
+ * 合约部署脚本 (本地 + Sepolia 通用)
  *
- * 使用方法:
- *   本地: npx hardhat run scripts/deploy.js --network localhost
- *   测试网: npx hardhat run scripts/deploy.js --network sepolia
+ * 本地: npx hardhat run scripts/deploy.js --network localhost
+ * 测试网: npx hardhat run scripts/deploy.js --network sepolia
+ *
+ * 本地模式额外操作: 添加候选人 张三/李四, 注册前5个测试账户为选民
  */
 
 const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
-// 默认开发用 ElGamal 私钥 (仅用于测试/开发, 生产环境应使用安全生成的密钥)
-const DEFAULT_ADMIN_SK = "12345678901234567890";
+const DEV_SK = "12345678901234567890";
 
 async function computeElGamalPK(sk) {
-  const circomlibjs = require("circomlibjs");
-  const babyJub = await circomlibjs.buildBabyjub();
-  const F = babyJub.F;
+  const { buildBabyjub } = require("circomlibjs");
+  const bjj = await buildBabyjub();
+  const F = bjj.F;
   const G = [
     F.e(5299619240641551281634865583518297030282874472190772894086521144482721001553n),
-    F.e(16950150798460657717958625567821834550301663161624707787222815936182638968203n)
+    F.e(16950150798460657717958625567821834550301663161624707787222815936182638968203n),
   ];
-  const pk = babyJub.mulPointEscalar(G, BigInt(sk));
+  const pk = bjj.mulPointEscalar(G, BigInt(sk));
   return [F.toObject(pk[0]).toString(), F.toObject(pk[1]).toString()];
 }
 
 async function main() {
-  console.log("=".repeat(60));
-  console.log("  区块链电子投票系统 - 智能合约部署 (ZKP 版本)");
-  console.log("=".repeat(60));
+  const isLocal = ["localhost", "hardhat"].includes(hre.network.name);
+  console.log("部署网络:", hre.network.name);
 
-  const [deployer] = await hre.ethers.getSigners();
-  console.log("\n部署账户:", deployer.address);
+  const signers = await hre.ethers.getSigners();
+  const deployer = signers[0];
+  console.log("部署账户:", deployer.address);
 
-  const balance = await hre.ethers.provider.getBalance(deployer.address);
-  console.log("账户余额:", hre.ethers.formatEther(balance), "ETH");
-
-  // 从环境变量加载 ElGamal 公钥，或从私钥计算
-  let elgamalPKX, elgamalPKY;
+  // ElGamal 公钥
+  let pkX, pkY;
   if (process.env.ELGAMAL_PK_X && process.env.ELGAMAL_PK_Y) {
-    elgamalPKX = process.env.ELGAMAL_PK_X;
-    elgamalPKY = process.env.ELGAMAL_PK_Y;
-    console.log("\n使用环境变量中的 ElGamal 公钥");
+    [pkX, pkY] = [process.env.ELGAMAL_PK_X, process.env.ELGAMAL_PK_Y];
   } else {
-    const sk = process.env.ELGAMAL_SK || DEFAULT_ADMIN_SK;
-    console.log("\n从私钥计算 ElGamal 公钥 (sk =", sk, ")...");
-    [elgamalPKX, elgamalPKY] = await computeElGamalPK(sk);
+    const sk = isLocal ? DEV_SK : (process.env.ELGAMAL_SK || DEV_SK);
+    [pkX, pkY] = await computeElGamalPK(sk);
+    console.log(`ElGamal PK 计算完成 (sk=${sk.slice(0, 8)}...)`);
   }
-  console.log("ElGamal 公钥:");
-  console.log("  PK.x:", elgamalPKX);
-  console.log("  PK.y:", elgamalPKY);
 
-  // ============ 步骤 1: 部署 VoterRegistry ============
-  console.log("\n" + "-".repeat(60));
-  console.log("步骤 1: 部署 VoterRegistry 合约");
-  console.log("-".repeat(60));
+  // 部署所有合约
+  console.log("\n部署合约...");
+  const deploy = async (name, ...args) => {
+    const c = await (await hre.ethers.getContractFactory(name)).deploy(...args);
+    await c.waitForDeployment();
+    const addr = await c.getAddress();
+    console.log(`  ${name}: ${addr}`);
+    return { contract: c, addr };
+  };
 
-  const VoterRegistry = await hre.ethers.getContractFactory("VoterRegistry");
-  const voterRegistry = await VoterRegistry.deploy();
-  await voterRegistry.waitForDeployment();
+  const { contract: registry, addr: regAddr }     = await deploy("VoterRegistry");
+  const { addr: voteVerAddr }                      = await deploy("VoteVerifier");
+  const { addr: tallyVerAddr }                     = await deploy("TallyVerifier");
+  const { contract: voting, addr: votingAddr }     = await deploy("Voting",
+    regAddr, "2026年度评选", "零知识证明保护投票隐私", voteVerAddr, tallyVerAddr, [pkX, pkY]);
+  const { addr: merkleAddr }                       = await deploy("MerkleVerifier");
 
-  const voterRegistryAddress = await voterRegistry.getAddress();
-  console.log("VoterRegistry 部署成功");
-  console.log("  地址:", voterRegistryAddress);
+  await (await registry.setVotingContract(votingAddr)).wait();
 
-  // ============ 步骤 2: 部署 VoteVerifier ============
-  console.log("\n" + "-".repeat(60));
-  console.log("步骤 2: 部署 VoteVerifier 合约 (ZKP1+ZKP2)");
-  console.log("-".repeat(60));
+  // 本地模式: 初始化候选人和选民
+  if (isLocal) {
+    for (const name of ["张三", "李四"]) {
+      await (await voting.addCandidate(name)).wait();
+    }
+    const voters = signers.slice(1, 6).map(s => s.address);
+    await (await registry.registerVotersBatch(voters)).wait();
+    console.log("\n本地初始化: 2个候选人, 5个选民已注册");
+  }
 
-  const VoteVerifier = await hre.ethers.getContractFactory("VoteVerifier");
-  const voteVerifier = await VoteVerifier.deploy();
-  await voteVerifier.waitForDeployment();
-
-  const voteVerifierAddress = await voteVerifier.getAddress();
-  console.log("VoteVerifier 部署成功");
-  console.log("  地址:", voteVerifierAddress);
-
-  // ============ 步骤 3: 部署 TallyVerifier ============
-  console.log("\n" + "-".repeat(60));
-  console.log("步骤 3: 部署 TallyVerifier 合约 (ZKP3)");
-  console.log("-".repeat(60));
-
-  const TallyVerifier = await hre.ethers.getContractFactory("TallyVerifier");
-  const tallyVerifier = await TallyVerifier.deploy();
-  await tallyVerifier.waitForDeployment();
-
-  const tallyVerifierAddress = await tallyVerifier.getAddress();
-  console.log("TallyVerifier 部署成功");
-  console.log("  地址:", tallyVerifierAddress);
-
-  // ============ 步骤 4: 部署 Voting ============
-  console.log("\n" + "-".repeat(60));
-  console.log("步骤 4: 部署 Voting 合约 (ZKP 版本)");
-  console.log("-".repeat(60));
-
-  const electionTitle = "2026 年度最佳员工评选";
-  const electionDescription = "使用零知识证明保护投票隐私";
-
-  const Voting = await hre.ethers.getContractFactory("Voting");
-  const voting = await Voting.deploy(
-    voterRegistryAddress,
-    electionTitle,
-    electionDescription,
-    voteVerifierAddress,
-    tallyVerifierAddress,
-    [elgamalPKX, elgamalPKY]
-  );
-  await voting.waitForDeployment();
-
-  const votingAddress = await voting.getAddress();
-  console.log("Voting 合约部署成功");
-  console.log("  地址:", votingAddress);
-  console.log("  标题:", electionTitle);
-
-  // ============ 步骤 5: 部署 MerkleVerifier ============
-  console.log("\n" + "-".repeat(60));
-  console.log("步骤 5: 部署 MerkleVerifier 合约");
-  console.log("-".repeat(60));
-
-  const MerkleVerifier = await hre.ethers.getContractFactory("MerkleVerifier");
-  const merkleVerifier = await MerkleVerifier.deploy();
-  await merkleVerifier.waitForDeployment();
-
-  const merkleVerifierAddress = await merkleVerifier.getAddress();
-  console.log("MerkleVerifier 部署成功");
-  console.log("  地址:", merkleVerifierAddress);
-
-  // ============ 步骤 6: 关联合约 ============
-  console.log("\n" + "-".repeat(60));
-  console.log("步骤 6: 关联 VoterRegistry 和 Voting 合约");
-  console.log("-".repeat(60));
-
-  const tx = await voterRegistry.setVotingContract(votingAddress);
-  await tx.wait();
-  console.log("VoterRegistry.setVotingContract() 调用成功");
-
-  // ============ 步骤 7: 保存合约地址 ============
-  console.log("\n" + "-".repeat(60));
-  console.log("步骤 7: 保存合约地址到 .env 和 frontend/config.js");
-  console.log("-".repeat(60));
-
-  // 更新 .env 文件
+  // 更新 .env
   const envPath = path.resolve(__dirname, "../.env");
-  let envContent = "";
-  try {
-    envContent = fs.readFileSync(envPath, "utf8");
-  } catch (e) {
-    // .env may not exist yet
-  }
-
-  // 移除旧的合约地址配置
-  envContent = envContent.replace(/\n# ============ 合约地址[\s\S]*?(?=\n# ====|$)/, "");
-  envContent = envContent.replace(/^VOTING_CONTRACT_ADDRESS=.*\n?/gm, "");
-  envContent = envContent.replace(/^VOTER_REGISTRY_ADDRESS=.*\n?/gm, "");
-  envContent = envContent.replace(/^MERKLE_VERIFIER_ADDRESS=.*\n?/gm, "");
-  envContent = envContent.replace(/^VOTE_VERIFIER_ADDRESS=.*\n?/gm, "");
-  envContent = envContent.replace(/^TALLY_VERIFIER_ADDRESS=.*\n?/gm, "");
-
-  if (!envContent.endsWith("\n")) envContent += "\n";
-
-  envContent += `
-# ============ 合约地址 (由 deploy.js 自动生成) ============
-VOTING_CONTRACT_ADDRESS=${votingAddress}
-VOTER_REGISTRY_ADDRESS=${voterRegistryAddress}
-MERKLE_VERIFIER_ADDRESS=${merkleVerifierAddress}
-VOTE_VERIFIER_ADDRESS=${voteVerifierAddress}
-TALLY_VERIFIER_ADDRESS=${tallyVerifierAddress}
-`;
-
-  fs.writeFileSync(envPath, envContent);
-  console.log("合约地址已写入 .env");
-
-  // 判断网络
-  const networkName = hre.network.name;
-  let networkConfig;
-  if (networkName === "localhost" || networkName === "hardhat") {
-    networkConfig = `{
-    name: "Localhost",
-    chainId: 31337,
-    chainIdHex: "0x7a69",
-    rpcUrl: "http://127.0.0.1:8545"
-  }`;
-  } else {
-    networkConfig = `{
-    name: "Sepolia",
-    chainId: 11155111,
-    chainIdHex: "0xaa36a7",
-    rpcUrl: "https://rpc.sepolia.org",
-    explorerUrl: "https://sepolia.etherscan.io"
-  }`;
-  }
+  let env = "";
+  try { env = fs.readFileSync(envPath, "utf8"); } catch (_) {}
+  env = env.replace(/^(VOTING_CONTRACT_ADDRESS|VOTER_REGISTRY_ADDRESS|MERKLE_VERIFIER_ADDRESS|VOTE_VERIFIER_ADDRESS|TALLY_VERIFIER_ADDRESS)=.*\n?/gm, "");
+  env = env.replace(/\n# 合约地址[\s\S]*?(?=\n#|$)/, "");
+  if (!env.endsWith("\n")) env += "\n";
+  env += `\n# 合约地址\nVOTING_CONTRACT_ADDRESS=${votingAddr}\nVOTER_REGISTRY_ADDRESS=${regAddr}\nMERKLE_VERIFIER_ADDRESS=${merkleAddr}\nVOTE_VERIFIER_ADDRESS=${voteVerAddr}\nTALLY_VERIFIER_ADDRESS=${tallyVerAddr}\n`;
+  fs.writeFileSync(envPath, env);
 
   // 生成 frontend/config.js
-  const configContent = `// 合约配置 (由 deploy.js 自动生成，请勿手动修改)
-// Generated by deploy.js - Do not edit manually
+  const networkCfg = isLocal
+    ? `{ name:"Localhost", chainId:31337, chainIdHex:"0x7a69" }`
+    : `{ name:"Sepolia", chainId:11155111, chainIdHex:"0xaa36a7", rpcUrl:"https://rpc.sepolia.org", explorerUrl:"https://sepolia.etherscan.io" }`;
+
+  const devLine = isLocal ? `\n  DEV_ADMIN_SK: "${DEV_SK}",` : "";
+
+  fs.writeFileSync(path.resolve(__dirname, "../frontend/config.js"),
+`// 合约配置 (由 deploy.js 自动生成)
 const CONTRACT_CONFIG = {
-  VOTING_ADDRESS: "${votingAddress}",
-  VOTER_REGISTRY_ADDRESS: "${voterRegistryAddress}",
-  MERKLE_VERIFIER_ADDRESS: "${merkleVerifierAddress}",
-  VOTE_VERIFIER_ADDRESS: "${voteVerifierAddress}",
-  TALLY_VERIFIER_ADDRESS: "${tallyVerifierAddress}",
-  NETWORK: ${networkConfig},
-  // ElGamal 公钥 (BabyJubJub 点)
-  ELGAMAL_PK: {
-    x: "${elgamalPKX}",
-    y: "${elgamalPKY}"
-  },
-  // ZKP 资源路径
+  VOTING_ADDRESS: "${votingAddr}",
+  VOTER_REGISTRY_ADDRESS: "${regAddr}",
+  MERKLE_VERIFIER_ADDRESS: "${merkleAddr}",
+  VOTE_VERIFIER_ADDRESS: "${voteVerAddr}",
+  TALLY_VERIFIER_ADDRESS: "${tallyVerAddr}",
+  NETWORK: ${networkCfg},
+  ELGAMAL_PK: { x:"${pkX}", y:"${pkY}" },${devLine}
   ZKP: {
     VOTE_PROOF_WASM: "zk/vote_proof.wasm",
     VOTE_PROOF_ZKEY: "zk/vote_proof_final.zkey",
     TALLY_PROOF_WASM: "zk/tally_proof.wasm",
     TALLY_PROOF_ZKEY: "zk/tally_proof_final.zkey"
   }
-};
-`;
+};`);
 
-  const configPath = path.resolve(__dirname, "../frontend/config.js");
-  fs.writeFileSync(configPath, configContent);
-  console.log("frontend/config.js 已生成");
+  console.log("\n部署完成:");
+  console.log("  Voting:        ", votingAddr);
+  console.log("  VoterRegistry: ", regAddr);
+  console.log("  VoteVerifier:  ", voteVerAddr);
+  console.log("  TallyVerifier: ", tallyVerAddr);
+  console.log("  MerkleVerifier:", merkleAddr);
 
-  // ============ 部署总结 ============
-  console.log("\n" + "=".repeat(60));
-  console.log("  部署完成！合约地址汇总");
-  console.log("=".repeat(60));
-  console.log("\nVoterRegistry: ", voterRegistryAddress);
-  console.log("VoteVerifier:  ", voteVerifierAddress);
-  console.log("TallyVerifier: ", tallyVerifierAddress);
-  console.log("Voting:        ", votingAddress);
-  console.log("MerkleVerifier:", merkleVerifierAddress);
-
-  const deploymentInfo = {
-    network: hre.network.name,
-    deployer: deployer.address,
-    timestamp: new Date().toISOString(),
-    contracts: {
-      VoterRegistry: voterRegistryAddress,
-      VoteVerifier: voteVerifierAddress,
-      TallyVerifier: tallyVerifierAddress,
-      Voting: votingAddress,
-      MerkleVerifier: merkleVerifierAddress
-    },
-    election: {
-      title: electionTitle,
-      description: electionDescription
-    },
-    elgamalPK: {
-      x: elgamalPKX,
-      y: elgamalPKY
-    }
-  };
-
-  console.log("\n部署信息 (JSON):");
-  console.log(JSON.stringify(deploymentInfo, null, 2));
-
-  return deploymentInfo;
+  if (isLocal) {
+    console.log("\n启动服务: python -m uvicorn server:app --port 8000");
+    console.log("投票页面: http://localhost:8000/");
+    console.log("管理页面: http://localhost:8000/admin");
+    console.log("ElGamal私钥:", DEV_SK);
+  }
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error("部署失败:", error);
-    process.exit(1);
-  });
+main().then(() => process.exit(0)).catch(e => { console.error("部署失败:", e); process.exit(1); });
