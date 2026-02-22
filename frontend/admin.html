@@ -496,12 +496,16 @@
                     候选人管理
                 </div>
                 <div class="input-group">
-                    <label>候选人姓名</label>
-                    <input type="text" id="candidateName" placeholder="输入候选人姓名" onkeydown="if(event.key==='Enter')addCandidate()" />
+                    <label>候选人 0 姓名</label>
+                    <input type="text" id="candidateName0" placeholder="候选人 0（如：张三）" />
                 </div>
-                <button class="btn btn-cta" id="addCandidateBtn" onclick="addCandidate()" disabled>
+                <div class="input-group">
+                    <label>候选人 1 姓名</label>
+                    <input type="text" id="candidateName1" placeholder="候选人 1（如：李四）" onkeydown="if(event.key==='Enter')addCandidates()" />
+                </div>
+                <button class="btn btn-cta" id="addCandidateBtn" onclick="addCandidates()" disabled>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    添加候选人
+                    添加两位候选人
                 </button>
                 <div id="candidateList" style="margin-top:8px;"></div>
             </div>
@@ -602,6 +606,7 @@
             "function getElectionInfo() view returns (string, string, uint8, uint256, uint256)",
             "function getCandidate(uint256) view returns (string, uint256)",
             "function addCandidate(string)",
+            "function addCandidates(string, string)",
             "function startElection()",
             "function endElection()",
             "function updateTallyResults(uint256[], bytes32, uint256[2], uint256[2][2], uint256[2], uint256[15])",
@@ -894,25 +899,27 @@
             btn.disabled = false;
             btn.innerHTML = '注册选民';
         }
-        async function addCandidate() {
-            const name = document.getElementById('candidateName').value.trim();
-            if (!name) { addLog('请输入候选人姓名', 'warning'); return; }
+        async function addCandidates() {
+            const name0 = document.getElementById('candidateName0').value.trim();
+            const name1 = document.getElementById('candidateName1').value.trim();
+            if (!name0 || !name1) { addLog('请输入两位候选人姓名', 'warning'); return; }
             const btn = document.getElementById('addCandidateBtn');
             btn.disabled = true;
             btn.innerHTML = '<span class="loading"></span> 添加中...';
             try {
-                addLog(`正在添加候选人: ${name}`, 'info');
-                const tx = await votingContract.addCandidate(name);
+                addLog(`正在添加候选人: ${name0}, ${name1}`, 'info');
+                const tx = await votingContract.addCandidates(name0, name1);
                 addLog('等待交易确认...', 'info');
                 await tx.wait();
-                addLog('候选人添加成功！', 'success');
-                document.getElementById('candidateName').value = '';
+                addLog('两位候选人添加成功！(1 笔交易)', 'success');
+                document.getElementById('candidateName0').value = '';
+                document.getElementById('candidateName1').value = '';
                 await loadElectionInfo();
             } catch (error) {
                 addLog(`添加失败: ${error.message}`, 'error');
             }
             btn.disabled = false;
-            btn.innerHTML = '添加候选人';
+            btn.innerHTML = '添加两位候选人';
         }
 
         async function startElection() {

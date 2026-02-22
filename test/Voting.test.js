@@ -314,8 +314,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
       });
 
       it("管理员应该能添加候选人", async function () {
-        await voting.addCandidate("Alice");
-        await voting.addCandidate("Bob");
+        await voting.addCandidates("Alice", "Bob");
         expect(await voting.candidateCount()).to.equal(2);
       });
 
@@ -326,8 +325,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
       });
 
       it("选举开始后不能添加候选人", async function () {
-        await voting.addCandidate("Alice");
-        await voting.addCandidate("Bob");
+        await voting.addCandidates("Alice", "Bob");
         await voting.startElection();
         await expect(voting.addCandidate("Charlie")).to.be.revertedWith("Voting: invalid status");
       });
@@ -335,8 +333,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
 
     describe("选举流程", function () {
       beforeEach(async function () {
-        await voting.addCandidate("Alice");
-        await voting.addCandidate("Bob");
+        await voting.addCandidates("Alice", "Bob");
       });
 
       it("需要至少 2 个候选人才能开始选举", async function () {
@@ -365,8 +362,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
 
     describe("投票功能 (ZKP)", function () {
       beforeEach(async function () {
-        await voting.addCandidate("Alice");
-        await voting.addCandidate("Bob");
+        await voting.addCandidates("Alice", "Bob");
         await voting.startElection();
       });
 
@@ -408,8 +404,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
           await voteVerifier.getAddress(), await tallyVerifier.getAddress(), adminPkStr
         );
         await voterRegistry.setVotingContract(await newVoting.getAddress());
-        await newVoting.addCandidate("A");
-        await newVoting.addCandidate("B");
+        await newVoting.addCandidates("A", "B");
         // Fails at electionActive modifier before proof verification
         await expect(
           newVoting.connect(voter1).castVote(
@@ -431,8 +426,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
 
     describe("计票功能 (ZKP)", function () {
       beforeEach(async function () {
-        await voting.addCandidate("Alice");
-        await voting.addCandidate("Bob");
+        await voting.addCandidates("Alice", "Bob");
         await voting.startElection();
         await castRealVote(voter1, vote1Data);
         await castRealVote(voter2, vote2Data);
@@ -509,8 +503,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
 
     describe("查询功能", function () {
       beforeEach(async function () {
-        await voting.addCandidate("Alice");
-        await voting.addCandidate("Bob");
+        await voting.addCandidates("Alice", "Bob");
       });
 
       it("应该能获取所有候选人", async function () {
@@ -561,8 +554,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
         voter1.address, voter2.address, voter3.address
       ]);
 
-      await voting.addCandidate("Alice");
-      await voting.addCandidate("Bob");
+      await voting.addCandidates("Alice", "Bob");
       await voting.startElection();
 
       await castRealVote(voter1, vote1Data);

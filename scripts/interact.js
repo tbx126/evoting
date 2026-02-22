@@ -104,17 +104,10 @@ async function showStatus(voting, voterRegistry) {
 }
 
 async function addCandidates(voting) {
-  console.log("\n添加候选人...");
-
-  const candidates = ["Alice", "Bob"];
-  for (const name of candidates) {
-    console.log(`  添加 ${name}...`);
-    const tx = await voting.addCandidate(name);
-    await tx.wait();
-    console.log(`  ✓ ${name} 添加成功`);
-  }
-
-  console.log("\n✓ 所有候选人添加完成");
+  console.log("\n添加候选人 (Alice, Bob)...");
+  const tx = await voting.addCandidates("Alice", "Bob");
+  await tx.wait();
+  console.log("✓ 两位候选人添加完成 (1 笔交易)");
 }
 
 async function registerVoter(voterRegistry, voterAddress) {

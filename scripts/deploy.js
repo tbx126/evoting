@@ -64,9 +64,7 @@ async function main() {
 
   // 本地模式: 初始化候选人和选民
   if (isLocal) {
-    for (const name of ["张三", "李四"]) {
-      await (await voting.addCandidate(name)).wait();
-    }
+    await (await voting.addCandidates("张三", "李四")).wait();
     const voters = signers.slice(1, 6).map(s => s.address);
     await (await registry.registerVotersBatch(voters)).wait();
     console.log("\n本地初始化: 2个候选人, 5个选民已注册");

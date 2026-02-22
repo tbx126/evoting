@@ -177,7 +177,7 @@ contract Voting {
     // ============ 选举管理函数 ============
 
     /**
-     * @notice 添加候选人
+     * @notice 添加单个候选人
      * @param _name 候选人名称
      */
     function addCandidate(string calldata _name) external onlyAdmin inStatus(ElectionStatus.Created) {
@@ -187,8 +187,21 @@ contract Voting {
             name: _name,
             voteCount: 0
         });
-
         emit CandidateAdded(candidateId, _name);
+    }
+
+    /**
+     * @notice 一次性添加两位候选人（候选人数量硬编码为 2）
+     * @param _name0 候选人 0 的名称
+     * @param _name1 候选人 1 的名称
+     */
+    function addCandidates(string calldata _name0, string calldata _name1) external onlyAdmin inStatus(ElectionStatus.Created) {
+        require(candidateCount == 0, "Voting: candidates already added");
+        candidates[0] = Candidate({ id: 0, name: _name0, voteCount: 0 });
+        candidates[1] = Candidate({ id: 1, name: _name1, voteCount: 0 });
+        candidateCount = 2;
+        emit CandidateAdded(0, _name0);
+        emit CandidateAdded(1, _name1);
     }
 
     /**
