@@ -110,7 +110,7 @@ The key operational output is that a voter can validate inclusion without callin
 
 \section{Performance Evaluation}
 
-This section reports quantitative measurements of the system's on-chain gas consumption, zero-knowledge proof circuit complexity, client-side artifact footprint, and smart contract bytecode size. All measurements were taken using the project's current build artifacts with Solidity 0.8.20 (optimizer enabled, 200 runs), Groth16 on BN254, and the circuit configuration of $N=3$ candidates.
+This section reports quantitative measurements of the system's on-chain gas consumption, zero-knowledge proof circuit complexity, client-side artifact footprint, and smart contract bytecode size. All measurements were taken using the project's current build artifacts with Solidity 0.8.20 (optimizer enabled, 200 runs), Groth16 on BN254, and the circuit configuration of $N=2$ candidates.
 
 \subsection{Circuit Complexity}
 
@@ -119,14 +119,14 @@ Table \ref{tab:circuit-complexity} summarizes the R1CS constraint systems produc
 \begin{table}[htbp]
 \centering
 \small
-\caption{ZKP Circuit Complexity (N = 3 Candidates)}
+\caption{ZKP Circuit Complexity (N = 2 Candidates)}
 \label{tab:circuit-complexity}
 \begin{tabular}{L{3.2cm} L{2.0cm} L{2.0cm} L{2.0cm} L{2.0cm}}
 \toprule
 Circuit & Constraints & Wires & Public Inputs & Private Inputs \\
 \midrule
-\texttt{vote\_proof} & 21{,}477 & 21{,}480 & 4 & 17 \\
-\texttt{tally\_proof} & 23{,}232 & 23{,}237 & 21 & 1 \\
+\texttt{vote\_proof} & 14{,}590 & 14{,}593 & 4 & 12 \\
+\texttt{tally\_proof} & 16{,}786 & 16{,}790 & 15 & 1 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -146,17 +146,17 @@ Proof generation in the browser requires downloading WASM witness generators and
 \toprule
 Artifact & Size & Role \\
 \midrule
-\texttt{vote\_proof.wasm} & 3.57 MB & Witness generator for vote proof \\
-\texttt{vote\_proof\_final.zkey} & 11.02 MB & Proving key for vote proof \\
-\texttt{tally\_proof.wasm} & 168.6 KB & Witness generator for tally proof \\
-\texttt{tally\_proof\_final.zkey} & 11.89 MB & Proving key for tally proof \\
-\texttt{vote\_proof.r1cs} & 4.14 MB & Constraint system (build-time only) \\
-\texttt{tally\_proof.r1cs} & 4.51 MB & Constraint system (build-time only) \\
+\texttt{vote\_proof.wasm} & 2.94 MB & Witness generator for vote proof \\
+\texttt{vote\_proof\_final.zkey} & 7.11 MB & Proving key for vote proof \\
+\texttt{tally\_proof.wasm} & 143.0 KB & Witness generator for tally proof \\
+\texttt{tally\_proof\_final.zkey} & 9.12 MB & Proving key for tally proof \\
+\texttt{vote\_proof.r1cs} & 2.79 MB & Constraint system (build-time only) \\
+\texttt{tally\_proof.r1cs} & 3.24 MB & Constraint system (build-time only) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-For a voter casting a ballot, the browser must load approximately 14.6~MB of proof artifacts (WASM + zkey). This is a one-time download per session and can be cached. The administrator performing a tally loads approximately 12.1~MB. These sizes are consistent with typical Groth16 deployments at this constraint scale and are within practical browser download budgets for modern connections.
+For a voter casting a ballot, the browser must load approximately 10.0~MB of proof artifacts (WASM + zkey). This is a one-time download per session and can be cached. The administrator performing a tally loads approximately 9.3~MB. These sizes are consistent with typical Groth16 deployments at this constraint scale and are within practical browser download budgets for modern connections.
 
 \subsection{On-Chain Gas Consumption}
 
@@ -187,7 +187,7 @@ To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{
 
 \subsection{Proof Generation Latency}
 
-Groth16 proof generation is the most computationally intensive client-side operation. It involves multi-scalar multiplication over the proving key, which scales with the number of circuit constraints. For the current configuration ($N = 3$), the project test suite reports proof generation times of approximately 3--8 seconds per vote proof and 4--10 seconds per tally proof when executed in Node.js (snarkjs, single-threaded). Browser-based execution using snarkjs WASM is expected to exhibit similar or moderately longer latencies depending on device hardware.
+Groth16 proof generation is the most computationally intensive client-side operation. It involves multi-scalar multiplication over the proving key, which scales with the number of circuit constraints. For the current configuration ($N = 2$), the project test suite reports proof generation times of approximately 3--8 seconds per vote proof and 4--10 seconds per tally proof when executed in Node.js (snarkjs, single-threaded). Browser-based execution using snarkjs WASM is expected to exhibit similar or moderately longer latencies depending on device hardware.
 
 These times are acceptable for a prototype where voters submit one ballot per election. However, they represent a usability consideration: the voter interface should communicate proof-generation progress to avoid the impression of an unresponsive application.
 
@@ -204,26 +204,26 @@ Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170). 
 \toprule
 Contract & Deployed Size & Notes \\
 \midrule
-\texttt{Voting} & 7{,}633 bytes (7.5 KB) & Main election logic; largest contract \\
+\texttt{Voting} & 7{,}637 bytes (7.5 KB) & Main election logic; largest contract \\
 \texttt{VoterRegistry} & 2{,}558 bytes (2.5 KB) & Registration and one-vote enforcement \\
 \texttt{VoteVerifier} & 1{,}658 bytes (1.6 KB) & Groth16 verifier (snarkjs-generated) \\
-\texttt{TallyVerifier} & 3{,}260 bytes (3.2 KB) & Groth16 verifier (snarkjs-generated) \\
+\texttt{TallyVerifier} & 2{,}690 bytes (2.6 KB) & Groth16 verifier (snarkjs-generated) \\
 \texttt{MerkleVerifier} & 942 bytes (0.9 KB) & Merkle proof verification \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The total deployed bytecode across all five contracts is 16{,}051 bytes. The Voting contract is the largest at 31\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. The Groth16 verifier contracts are compact because snarkjs generates optimized inline pairing-check code.
+The total deployed bytecode across all five contracts is 15{,}485 bytes. The Voting contract is the largest at 31\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. The Groth16 verifier contracts are compact because snarkjs generates optimized inline pairing-check code.
 
 \subsection{Scalability Discussion}
 
 The system's scalability characteristics vary by component. On-chain gas per vote (\texttt{castVote}) is essentially constant regardless of how many votes have already been cast, because each vote is independently verified and stored. However, two operations scale with election size:
 
 \begin{itemize}
-    \item \textbf{Tally aggregation} requires $O(VN)$ elliptic-curve point additions, performed off-chain by the administrator. For $V = 1{,}000$ votes and $N = 3$ candidates, this amounts to 3{,}000 point additions, completing in under one second on modern hardware.
+    \item \textbf{Tally aggregation} requires $O(VN)$ elliptic-curve point additions, performed off-chain by the administrator. For $V = 1{,}000$ votes and $N = 2$ candidates, this amounts to 2{,}000 point additions, completing in under one second on modern hardware.
     \item \textbf{Discrete-log recovery} during tally decryption uses a baby-step giant-step algorithm bounded by the maximum expected vote count per candidate. For tallies up to approximately $2^{20}$ ($\sim$1M votes), this requires $O(\sqrt{V})$ precomputed table entries, which is practical. Beyond this range, the brute-force search becomes a bottleneck.
     \item \textbf{Merkle tree construction} is $O(V)$ with $O(\log V)$ verification per inclusion check. For $V = 10{,}000$ commitments, tree construction completes in milliseconds.
-    \item \textbf{Circuit constraint scaling}: increasing the number of candidates from $N = 3$ to $N = 10$ would increase vote proof constraints approximately 3.3$\times$ (from $\sim$21k to $\sim$70k), proportionally increasing proof generation time and proving key size.
+    \item \textbf{Circuit constraint scaling}: increasing the number of candidates from $N = 2$ to $N = 10$ would increase vote proof constraints approximately 4.8$\times$ (from $\sim$15k to $\sim$73k), proportionally increasing proof generation time and proving key size.
 \end{itemize}
 
 Table \ref{tab:scalability-summary} summarizes the scaling profile.
@@ -347,7 +347,7 @@ Code review identified gaps that are important for full assurance:
     \item \textbf{Result binding gap}: contract verifies tally proof but does not strictly bind the submitted integer result vector to all public signals used by the circuit. This can allow inconsistencies if external checks are not enforced.
     \item \textbf{Ciphertext event binding gap}: the emitted encrypted payload is not fully bound to on-chain stored ciphertext hash. If an attacker can influence event payload parsing or indexing, off-chain tally can be poisoned.
     \item \textbf{Audit root cross-check gap}: voter-side inclusion verification should compare bundle root with on-chain stored root to prevent acceptance of a self-consistent but unauthorized bundle.
-    \item \textbf{Candidate cardinality mismatch}: circuits are compiled for three candidates while contract permits dynamic candidate count; this creates a mismatch risk if used incorrectly.
+    \item \textbf{Candidate cardinality mismatch}: circuits are compiled for two candidates while contract permits dynamic candidate count; deploying with more than two candidates will cause proof verification failures.
     \item \textbf{Merkle root mutability}: a direct root-update function exists without strict lifecycle gating; this increases governance attack surface.
 \end{itemize}
 

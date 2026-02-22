@@ -44,7 +44,7 @@ The following roadmap is prioritized for completing remaining tasks:
     \item \textbf{Strict binding of tally results}: bind the submitted result vector to the public signals verified by Groth16 to prevent inconsistent reporting.
     \item \textbf{Encrypted payload integrity}: compute and enforce ciphertext hash binding to emitted payloads or redesign tally ingestion to avoid relying on mutable sources.
     \item \textbf{Root authenticity checks}: compare audit bundle root to on-chain \texttt{merkleRoot} in the voter verification flow.
-    \item \textbf{Candidate-count alignment}: enforce candidate count constraints at contract level or support per-election circuit generation and verifier deployment.
+    \item \textbf{Candidate-count enforcement}: circuits are hardcoded for two candidates; enforce this constraint at the contract level to prevent mismatched deployments from accepting proofs silently.
     \item \textbf{Governance hardening}: lifecycle-gate or remove unrestricted Merkle-root overwrite functions.
     \item \textbf{Decentralized key management}: introduce threshold encryption/decryption or multi-party custody to reduce single-admin trust.
     \item \textbf{Coercion resistance research}: explore receipt-freeness mechanisms and stronger threat models.
@@ -62,7 +62,7 @@ Table \ref{tab:roadmap-phases} converts the future-work list into phased enginee
 Phase & Priority Deliverables & Expected Outcome \\
 \midrule
 Near-term & Result-vector/public-signal binding, bundle-root vs on-chain-root check, event payload integrity checks & Close critical correctness gaps and strengthen trust in audit outputs \\
-Mid-term & Candidate-count/circuit alignment, lifecycle-gated Merkle root governance, deployment hardening & Reduce misuse risk and improve operational robustness \\
+Mid-term & Candidate-count enforcement at contract level, lifecycle-gated Merkle root governance, deployment hardening & Reduce misuse risk and improve operational robustness \\
 Long-term & Threshold key management, coercion-resistance mechanisms, formal verification extensions & Move from prototype assurance toward high-assurance production viability \\
 \bottomrule
 \end{tabular}
