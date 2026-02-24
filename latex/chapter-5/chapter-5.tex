@@ -175,7 +175,7 @@ Operation & Estimated Gas & Dominant Cost Component \\
 \midrule
 \texttt{castVote} (voter) & 315{,}000--340{,}000 & Groth16 verification ($\sim$181k) + 4$\times$SSTORE ($\sim$80k) + calldata \\
 \texttt{updateTallyResults} (admin) & 310{,}000--330{,}000 & Groth16 verification ($\sim$181k) + result loop SSTORE + event \\
-\texttt{addCandidate} & $\sim$50{,}000 & SSTORE for candidate record \\
+\texttt{addCandidates} & $\sim$80{,}000 & Two candidate SSTOREs + candidateCount SSTORE + two events \\
 \texttt{startElection} & $\sim$28{,}000 & Single SSTORE for status transition \\
 \texttt{endElection} & $\sim$28{,}000 & Single SSTORE for status transition \\
 \texttt{registerVoter} (single) & $\sim$48{,}000 & SSTORE for registration record \\
@@ -204,7 +204,7 @@ Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170). 
 \toprule
 Contract & Deployed Size & Notes \\
 \midrule
-\texttt{Voting} & 7{,}637 bytes (7.5 KB) & Main election logic; largest contract \\
+\texttt{Voting} & 8{,}498 bytes (8.3 KB) & Main election logic; largest contract \\
 \texttt{VoterRegistry} & 2{,}558 bytes (2.5 KB) & Registration and one-vote enforcement \\
 \texttt{VoteVerifier} & 1{,}658 bytes (1.6 KB) & Groth16 verifier (snarkjs-generated) \\
 \texttt{TallyVerifier} & 2{,}690 bytes (2.6 KB) & Groth16 verifier (snarkjs-generated) \\
@@ -213,7 +213,7 @@ Contract & Deployed Size & Notes \\
 \end{tabular}
 \end{table}
 
-The total deployed bytecode across all five contracts is 15{,}485 bytes. The Voting contract is the largest at 31\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. The Groth16 verifier contracts are compact because snarkjs generates optimized inline pairing-check code.
+The total deployed bytecode across all five contracts is 16{,}346 bytes. The Voting contract is the largest at 35\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. The Groth16 verifier contracts are compact because snarkjs generates optimized inline pairing-check code.
 
 \subsection{Scalability Discussion}
 
