@@ -600,7 +600,6 @@
     <script src="lib/audit.js"></script>
     <script>
         const VOTING_ADDRESS = CONTRACT_CONFIG.VOTING_ADDRESS;
-        const VOTER_REGISTRY_ADDRESS = CONTRACT_CONFIG.VOTER_REGISTRY_ADDRESS;
 
         const VOTING_ABI = [
             "function getElectionInfo() view returns (string, string, uint8, uint256, uint256)",
@@ -612,18 +611,14 @@
             "function updateTallyResults(uint256[], bytes32, uint256[2], uint256[2][2], uint256[2], uint256[15])",
             "function admin() view returns (address)",
             "function getElgamalPK() view returns (uint256[2])",
-            "event EncryptedVoteCast(address indexed voter, bytes32 commitment, uint256[] encryptedVote)"
-        ];
-        const VOTER_REGISTRY_ABI = [
             "function registerVoter(address)",
             "function registerVotersBatch(address[])",
             "function isRegistered(address) view returns (bool)",
-            "function hasVoted(address) view returns (bool)",
             "function totalVoters() view returns (uint256)",
-            "function admin() view returns (address)"
+            "event EncryptedVoteCast(address indexed voter, bytes32 commitment, uint256[] encryptedVote)"
         ];
 
-        let provider, signer, votingContract, voterRegistryContract, currentAccount;
+        let provider, signer, votingContract, currentAccount;
         let candidates = [];
         let elgamal = null;
         let adminSK = null;
@@ -766,7 +761,6 @@
 
                 signer = await provider.getSigner();
                 votingContract = new ethers.Contract(VOTING_ADDRESS, VOTING_ABI, signer);
-                voterRegistryContract = new ethers.Contract(VOTER_REGISTRY_ADDRESS, VOTER_REGISTRY_ABI, signer);
 
                 const cachedElectionId = AuditLib.electionKey(CONTRACT_CONFIG.NETWORK.chainId, VOTING_ADDRESS);
                 const cachedBundle = localStorage.getItem('audit_bundle_' + cachedElectionId);
@@ -818,7 +812,7 @@
                 const status = Number(info[2]);
                 const candidateCount = Number(info[3]);
                 const totalVotes = Number(info[4]);
-                const totalVoters = await voterRegistryContract.totalVoters();
+                const totalVoters = await votingContract.totalVoters();
 
                 const statusEl = document.getElementById('electionStatus');
                 statusEl.textContent = STATUS_NAMES[status];
@@ -875,18 +869,18 @@
             try {
                 if (addresses.length === 1) {
                     const addr = addresses[0];
-                    const isRegistered = await voterRegistryContract.isRegistered(addr);
+                    const isRegistered = await votingContract.isRegistered(addr);
                     if (isRegistered) { addLog(`${addr.slice(0,10)}... 已注册`, 'warning'); }
                     else {
                         addLog(`正在注册选民: ${addr.slice(0, 10)}...`, 'info');
-                        const tx = await voterRegistryContract.registerVoter(addr);
+                        const tx = await votingContract.registerVoter(addr);
                         addLog('等待交易确认...', 'info');
                         await tx.wait();
                         addLog('选民注册成功！', 'success');
                     }
                 } else {
                     addLog(`批量注册 ${addresses.length} 个选民...`, 'info');
-                    const tx = await voterRegistryContract.registerVotersBatch(addresses);
+                    const tx = await votingContract.registerVotersBatch(addresses);
                     addLog('等待交易确认...', 'info');
                     await tx.wait();
                     addLog(`${addresses.length} 个选民注册成功！`, 'success');

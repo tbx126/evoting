@@ -53,20 +53,16 @@ async function main() {
     return { contract: c, addr };
   };
 
-  const { contract: registry, addr: regAddr }     = await deploy("VoterRegistry");
   const { addr: voteVerAddr }                      = await deploy("VoteVerifier");
   const { addr: tallyVerAddr }                     = await deploy("TallyVerifier");
   const { contract: voting, addr: votingAddr }     = await deploy("Voting",
-    regAddr, "2026年度评选", "零知识证明保护投票隐私", voteVerAddr, tallyVerAddr, [pkX, pkY]);
-  const { addr: merkleAddr }                       = await deploy("MerkleVerifier");
-
-  await (await registry.setVotingContract(votingAddr)).wait();
+    "2026年度评选", "零知识证明保护投票隐私", voteVerAddr, tallyVerAddr, [pkX, pkY]);
 
   // 本地模式: 初始化候选人和选民
   if (isLocal) {
     await (await voting.addCandidates("张三", "李四")).wait();
     const voters = signers.slice(1, 6).map(s => s.address);
-    await (await registry.registerVotersBatch(voters)).wait();
+    await (await voting.registerVotersBatch(voters)).wait();
     console.log("\n本地初始化: 2个候选人, 5个选民已注册");
   }
 
@@ -74,10 +70,10 @@ async function main() {
   const envPath = path.resolve(__dirname, "../.env");
   let env = "";
   try { env = fs.readFileSync(envPath, "utf8"); } catch (_) {}
-  env = env.replace(/^(VOTING_CONTRACT_ADDRESS|VOTER_REGISTRY_ADDRESS|MERKLE_VERIFIER_ADDRESS|VOTE_VERIFIER_ADDRESS|TALLY_VERIFIER_ADDRESS)=.*\n?/gm, "");
+  env = env.replace(/^(VOTING_CONTRACT_ADDRESS|VOTE_VERIFIER_ADDRESS|TALLY_VERIFIER_ADDRESS)=.*\n?/gm, "");
   env = env.replace(/\n# 合约地址[\s\S]*?(?=\n#|$)/, "");
   if (!env.endsWith("\n")) env += "\n";
-  env += `\n# 合约地址\nVOTING_CONTRACT_ADDRESS=${votingAddr}\nVOTER_REGISTRY_ADDRESS=${regAddr}\nMERKLE_VERIFIER_ADDRESS=${merkleAddr}\nVOTE_VERIFIER_ADDRESS=${voteVerAddr}\nTALLY_VERIFIER_ADDRESS=${tallyVerAddr}\n`;
+  env += `\n# 合约地址\nVOTING_CONTRACT_ADDRESS=${votingAddr}\nVOTE_VERIFIER_ADDRESS=${voteVerAddr}\nTALLY_VERIFIER_ADDRESS=${tallyVerAddr}\n`;
   fs.writeFileSync(envPath, env);
 
   // 生成 frontend/config.js
@@ -91,8 +87,6 @@ async function main() {
 `// 合约配置 (由 deploy.js 自动生成)
 const CONTRACT_CONFIG = {
   VOTING_ADDRESS: "${votingAddr}",
-  VOTER_REGISTRY_ADDRESS: "${regAddr}",
-  MERKLE_VERIFIER_ADDRESS: "${merkleAddr}",
   VOTE_VERIFIER_ADDRESS: "${voteVerAddr}",
   TALLY_VERIFIER_ADDRESS: "${tallyVerAddr}",
   NETWORK: ${networkCfg},
@@ -106,11 +100,9 @@ const CONTRACT_CONFIG = {
 };`);
 
   console.log("\n部署完成:");
-  console.log("  Voting:        ", votingAddr);
-  console.log("  VoterRegistry: ", regAddr);
-  console.log("  VoteVerifier:  ", voteVerAddr);
-  console.log("  TallyVerifier: ", tallyVerAddr);
-  console.log("  MerkleVerifier:", merkleAddr);
+  console.log("  Voting:       ", votingAddr);
+  console.log("  VoteVerifier: ", voteVerAddr);
+  console.log("  TallyVerifier:", tallyVerAddr);
 
   if (isLocal) {
     console.log("\n启动服务: python -m uvicorn server:app --port 8000");

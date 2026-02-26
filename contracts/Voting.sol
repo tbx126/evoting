@@ -2,15 +2,6 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title IVoterRegistry - 选民注册合约接口
- */
-interface IVoterRegistry {
-    function isRegistered(address _voter) external view returns (bool);
-    function hasVoted(address _voter) external view returns (bool);
-    function markAsVoted(address _voter) external;
-}
-
-/**
  * @title IVoteVerifier - ZKP 投票证明验证器接口
  */
 interface IVoteVerifier {
@@ -35,21 +26,17 @@ interface ITallyVerifier {
 }
 
 /**
- * @title Voting - ZKP 零知识证明投票合约
- * @notice 管理单场选举：投票提交（含 ZKP 证明）和结果统计（含计票证明）
+ * @title Voting - ZKP 零知识证明投票合约（含选民注册）
+ * @notice 管理单场选举：选民注册、投票提交（含 ZKP 证明）和结果统计（含计票证明）
  * @dev 使用 ElGamal on BabyJubJub 同态加密 + Groth16 零知识证明
  *      - ZKP1+ZKP2: 选票合法性 + 承诺-密文一致性（投票时验证）
  *      - ZKP3: 解密正确性（计票时验证）
- *      选举由管理员手动开启和关闭，无时间限制
  */
 contract Voting {
     // ============ 状态变量 ============
 
     /// @notice 合约管理员
     address public admin;
-
-    /// @notice 选民注册合约地址
-    address public voterRegistry;
 
     /// @notice ZKP 投票验证器合约
     address public voteVerifier;
@@ -80,6 +67,9 @@ contract Voting {
     /// @notice 总投票数
     uint256 public totalVotes;
 
+    /// @notice 已注册选民总数
+    uint256 public totalVoters;
+
     /// @notice Merkle 根哈希
     bytes32 public merkleRoot;
 
@@ -91,6 +81,13 @@ contract Voting {
         uint256 id;         // 候选人ID
         string name;        // 候选人名称
         uint256 voteCount;  // 得票数
+    }
+
+    /// @notice 选民信息结构体
+    struct Voter {
+        bool isRegistered;      // 是否已注册
+        bool hasVoted;          // 是否已投票
+        uint256 registeredAt;   // 注册时间戳
     }
 
     /// @notice 投票记录结构体
@@ -106,6 +103,9 @@ contract Voting {
     /// @notice 候选人ID => 候选人信息
     mapping(uint256 => Candidate) public candidates;
 
+    /// @notice 选民地址 => 选民信息
+    mapping(address => Voter) public voters;
+
     /// @notice 选民地址 => 投票记录
     mapping(address => VoteRecord) public voteRecords;
 
@@ -116,6 +116,7 @@ contract Voting {
 
     event ElectionInitialized(string title);
     event CandidateAdded(uint256 indexed candidateId, string name);
+    event VoterRegistered(address indexed voter, uint256 timestamp);
     event VoteCast(address indexed voter, bytes32 commitment, bytes32 ciphertextHash);
     event EncryptedVoteCast(address indexed voter, bytes32 commitment, uint256[] encryptedVote);
     event TallyCompleted(uint256[] results, bytes32 merkleRoot);
@@ -143,7 +144,6 @@ contract Voting {
 
     /**
      * @notice 部署并初始化选举
-     * @param _voterRegistry 选民注册合约地址
      * @param _title 选举标题
      * @param _description 选举描述
      * @param _voteVerifier ZKP 投票验证器合约地址
@@ -151,19 +151,16 @@ contract Voting {
      * @param _elgamalPK ElGamal 公钥 [pkX, pkY] (BabyJubJub 点)
      */
     constructor(
-        address _voterRegistry,
         string memory _title,
         string memory _description,
         address _voteVerifier,
         address _tallyVerifier,
         uint256[2] memory _elgamalPK
     ) {
-        require(_voterRegistry != address(0), "Voting: invalid registry");
         require(_voteVerifier != address(0), "Voting: invalid vote verifier");
         require(_tallyVerifier != address(0), "Voting: invalid tally verifier");
 
         admin = msg.sender;
-        voterRegistry = _voterRegistry;
         voteVerifier = _voteVerifier;
         tallyVerifier = _tallyVerifier;
         elgamalPK = _elgamalPK;
@@ -174,10 +171,48 @@ contract Voting {
         emit ElectionInitialized(_title);
     }
 
+    // ============ 选民注册函数 ============
+
+    /**
+     * @notice 注册单个选民
+     * @param _voter 选民钱包地址
+     */
+    function registerVoter(address _voter) external onlyAdmin {
+        require(_voter != address(0), "Voting: invalid address");
+        require(!voters[_voter].isRegistered, "Voting: already registered");
+
+        voters[_voter] = Voter({
+            isRegistered: true,
+            hasVoted: false,
+            registeredAt: block.timestamp
+        });
+        totalVoters++;
+        emit VoterRegistered(_voter, block.timestamp);
+    }
+
+    /**
+     * @notice 批量注册选民
+     * @param _voters 选民地址数组
+     */
+    function registerVotersBatch(address[] calldata _voters) external onlyAdmin {
+        for (uint256 i = 0; i < _voters.length; i++) {
+            address voter = _voters[i];
+            if (voter != address(0) && !voters[voter].isRegistered) {
+                voters[voter] = Voter({
+                    isRegistered: true,
+                    hasVoted: false,
+                    registeredAt: block.timestamp
+                });
+                totalVoters++;
+                emit VoterRegistered(voter, block.timestamp);
+            }
+        }
+    }
+
     // ============ 选举管理函数 ============
 
     /**
-     * @notice 添加单个候选人
+     * @notice 添加单个候选人（保留用于测试异常场景）
      * @param _name 候选人名称
      */
     function addCandidate(string calldata _name) external onlyAdmin inStatus(ElectionStatus.Created) {
@@ -209,7 +244,6 @@ contract Voting {
      */
     function startElection() external onlyAdmin inStatus(ElectionStatus.Created) {
         require(candidateCount >= 2, "Voting: need at least 2 candidates");
-
         status = ElectionStatus.Active;
         emit ElectionStatusChanged(ElectionStatus.Active);
     }
@@ -242,10 +276,8 @@ contract Voting {
         uint256[] calldata _encryptedVote
     ) external electionActive {
         // 1. 检查选民资格
-        IVoterRegistry registry = IVoterRegistry(voterRegistry);
-        require(registry.isRegistered(msg.sender), "Voting: not registered");
-        require(!registry.hasVoted(msg.sender), "Voting: already voted");
-
+        require(voters[msg.sender].isRegistered, "Voting: not registered");
+        require(!voters[msg.sender].hasVoted, "Voting: already voted");
         require(_commitment != bytes32(0), "Voting: invalid commitment");
         require(voteRecords[msg.sender].commitment == bytes32(0), "Voting: duplicate vote");
 
@@ -262,7 +294,7 @@ contract Voting {
         );
 
         // 3. 标记已投票
-        registry.markAsVoted(msg.sender);
+        voters[msg.sender].hasVoted = true;
 
         // 4. 记录投票
         voteRecords[msg.sender] = VoteRecord({
@@ -339,6 +371,32 @@ contract Voting {
     }
 
     // ============ 查询函数 ============
+
+    /**
+     * @notice 检查地址是否为已注册选民
+     */
+    function isRegistered(address _voter) external view returns (bool) {
+        return voters[_voter].isRegistered;
+    }
+
+    /**
+     * @notice 检查选民是否已投票
+     */
+    function hasVoted(address _voter) external view returns (bool) {
+        return voters[_voter].hasVoted;
+    }
+
+    /**
+     * @notice 获取选民完整信息
+     */
+    function getVoterInfo(address _voter) external view returns (
+        bool isReg,
+        bool voted,
+        uint256 regTime
+    ) {
+        Voter memory v = voters[_voter];
+        return (v.isRegistered, v.hasVoted, v.registeredAt);
+    }
 
     /**
      * @notice 获取选举信息

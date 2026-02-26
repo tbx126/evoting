@@ -16,10 +16,10 @@ const GENERATOR_X = 529961924064155128163486558351829703028287447219077289408652
 const GENERATOR_Y = 16950150798460657717958625567821834550301663161624707787222815936182638968203n;
 
 // Circuit file paths
-const VOTE_WASM = path.join(__dirname, "../build/vote_proof_js/vote_proof.wasm");
-const VOTE_ZKEY = path.join(__dirname, "../build/vote_proof_final.zkey");
-const TALLY_WASM = path.join(__dirname, "../build/tally_proof_js/tally_proof.wasm");
-const TALLY_ZKEY = path.join(__dirname, "../build/tally_proof_final.zkey");
+const VOTE_WASM = path.join(__dirname, "../frontend/zk/vote_proof.wasm");
+const VOTE_ZKEY = path.join(__dirname, "../frontend/zk/vote_proof_final.zkey");
+const TALLY_WASM = path.join(__dirname, "../frontend/zk/tally_proof.wasm");
+const TALLY_ZKEY = path.join(__dirname, "../frontend/zk/tally_proof_final.zkey");
 
 const NUM_CANDIDATES = 2;
 const ADMIN_SK = 12345678901234567890n;
@@ -35,7 +35,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
   let tallyData;
 
   // Contract instances
-  let voterRegistry, voting, voteVerifier, tallyVerifier, merkleVerifier;
+  let voting, voteVerifier, tallyVerifier;
   let admin, voter1, voter2, voter3, nonVoter;
 
   // ─── Crypto Helpers ─────────────────────────────────────
@@ -208,10 +208,6 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
   beforeEach(async function () {
     [admin, voter1, voter2, voter3, nonVoter] = await ethers.getSigners();
 
-    const VoterRegistry = await ethers.getContractFactory("VoterRegistry");
-    voterRegistry = await VoterRegistry.deploy();
-    await voterRegistry.waitForDeployment();
-
     const VoteVerifier = await ethers.getContractFactory("VoteVerifier");
     voteVerifier = await VoteVerifier.deploy();
     await voteVerifier.waitForDeployment();
@@ -222,19 +218,12 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
 
     const Voting = await ethers.getContractFactory("Voting");
     voting = await Voting.deploy(
-      await voterRegistry.getAddress(),
       "测试选举", "这是一个测试选举",
       await voteVerifier.getAddress(),
       await tallyVerifier.getAddress(),
       adminPkStr
     );
     await voting.waitForDeployment();
-
-    const MerkleVerifier = await ethers.getContractFactory("MerkleVerifier");
-    merkleVerifier = await MerkleVerifier.deploy();
-    await merkleVerifier.waitForDeployment();
-
-    await voterRegistry.setVotingContract(await voting.getAddress());
   });
 
   async function castRealVote(voterSigner, voteData) {
@@ -246,50 +235,41 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
     );
   }
 
-  // ============ VoterRegistry Tests ============
-  describe("VoterRegistry 合约", function () {
-    it("应该正确设置管理员", async function () {
-      expect(await voterRegistry.admin()).to.equal(admin.address);
-    });
-
+  // ============ Voter Registration Tests ============
+  describe("选民注册", function () {
     it("管理员应该能注册选民", async function () {
-      await voterRegistry.registerVoter(voter1.address);
-      expect(await voterRegistry.isRegistered(voter1.address)).to.be.true;
+      await voting.registerVoter(voter1.address);
+      expect(await voting.isRegistered(voter1.address)).to.be.true;
     });
 
     it("非管理员不能注册选民", async function () {
       await expect(
-        voterRegistry.connect(voter1).registerVoter(voter2.address)
-      ).to.be.revertedWith("VoterRegistry: caller is not admin");
+        voting.connect(voter1).registerVoter(voter2.address)
+      ).to.be.revertedWith("Voting: not admin");
     });
 
     it("不能重复注册同一选民", async function () {
-      await voterRegistry.registerVoter(voter1.address);
+      await voting.registerVoter(voter1.address);
       await expect(
-        voterRegistry.registerVoter(voter1.address)
-      ).to.be.revertedWith("VoterRegistry: already registered");
+        voting.registerVoter(voter1.address)
+      ).to.be.revertedWith("Voting: already registered");
     });
 
     it("应该能批量注册选民", async function () {
-      await voterRegistry.registerVotersBatch([
+      await voting.registerVotersBatch([
         voter1.address, voter2.address, voter3.address
       ]);
-      expect(await voterRegistry.isRegistered(voter1.address)).to.be.true;
-      expect(await voterRegistry.isRegistered(voter2.address)).to.be.true;
-      expect(await voterRegistry.isRegistered(voter3.address)).to.be.true;
-      expect(await voterRegistry.totalVoters()).to.equal(3);
-    });
-
-    it("应该能转移管理员权限", async function () {
-      await voterRegistry.transferAdmin(voter1.address);
-      expect(await voterRegistry.admin()).to.equal(voter1.address);
+      expect(await voting.isRegistered(voter1.address)).to.be.true;
+      expect(await voting.isRegistered(voter2.address)).to.be.true;
+      expect(await voting.isRegistered(voter3.address)).to.be.true;
+      expect(await voting.totalVoters()).to.equal(3);
     });
   });
 
   // ============ Voting Contract Tests ============
   describe("Voting 合约", function () {
     beforeEach(async function () {
-      await voterRegistry.registerVotersBatch([
+      await voting.registerVotersBatch([
         voter1.address, voter2.address, voter3.address
       ]);
     });
@@ -339,7 +319,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
       it("需要至少 2 个候选人才能开始选举", async function () {
         const Voting = await ethers.getContractFactory("Voting");
         const newVoting = await Voting.deploy(
-          await voterRegistry.getAddress(), "新选举", "描述",
+          "新选举", "描述",
           await voteVerifier.getAddress(), await tallyVerifier.getAddress(), adminPkStr
         );
         await newVoting.addCandidate("Only One");
@@ -400,10 +380,10 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
       it("选举未开始时不能投票", async function () {
         const Voting = await ethers.getContractFactory("Voting");
         const newVoting = await Voting.deploy(
-          await voterRegistry.getAddress(), "新选举", "描述",
+          "新选举", "描述",
           await voteVerifier.getAddress(), await tallyVerifier.getAddress(), adminPkStr
         );
-        await voterRegistry.setVotingContract(await newVoting.getAddress());
+        await newVoting.registerVoter(voter1.address);
         await newVoting.addCandidates("A", "B");
         // Fails at electionActive modifier before proof verification
         await expect(
@@ -525,32 +505,10 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
     });
   });
 
-  // ============ MerkleVerifier Tests ============
-  describe("MerkleVerifier 合约", function () {
-    it("应该正确验证 Merkle 证明", async function () {
-      const leaf1 = ethers.keccak256(ethers.toUtf8Bytes("vote1"));
-      const leaf2 = ethers.keccak256(ethers.toUtf8Bytes("vote2"));
-      const root = ethers.keccak256(
-        ethers.solidityPacked(["bytes32", "bytes32"], [leaf1, leaf2])
-      );
-      expect(await merkleVerifier.verify([leaf2], root, leaf1, 0)).to.be.true;
-    });
-
-    it("应该拒绝无效的 Merkle 证明", async function () {
-      const leaf1 = ethers.keccak256(ethers.toUtf8Bytes("vote1"));
-      const leaf2 = ethers.keccak256(ethers.toUtf8Bytes("vote2"));
-      const fakeLeaf = ethers.keccak256(ethers.toUtf8Bytes("fake"));
-      const root = ethers.keccak256(
-        ethers.solidityPacked(["bytes32", "bytes32"], [leaf1, leaf2])
-      );
-      expect(await merkleVerifier.verify([leaf2], root, fakeLeaf, 0)).to.be.false;
-    });
-  });
-
   // ============ Full Flow Test ============
   describe("完整投票流程 (ZKP 版本)", function () {
     it("应该完成从创建到计票的完整流程", async function () {
-      await voterRegistry.registerVotersBatch([
+      await voting.registerVotersBatch([
         voter1.address, voter2.address, voter3.address
       ]);
 

@@ -69,14 +69,11 @@ ZKP 层:
              ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  以太坊区块链 (Ethereum)                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Voting.sol   │  │VoterRegistry │  │MerkleVerifier│      │
-│  │ 主投票合约   │  │选民注册合约   │  │Merkle验证    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-│  ┌──────────────┐  ┌──────────────┐                         │
-│  │VoteVerifier  │  │TallyVerifier │                         │
-│  │投票ZKP验证   │  │计票ZKP验证   │                         │
-│  └──────────────┘  └──────────────┘                         │
+│  ┌──────────────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │ Voting.sol           │  │VoteVerifier  │  │TallyVerifier │ │
+│  │ 主投票合约           │  │投票ZKP验证   │  │计票ZKP验证   │ │
+│  │ (含选民注册逻辑)     │  └──────────────┘  └──────────────┘ │
+│  └──────────────────────┘                                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -86,9 +83,7 @@ ZKP 层:
 
 ```
 ├── contracts/               # Solidity 智能合约
-│   ├── Voting.sol           # 主投票合约（选举、投票、计票）
-│   ├── VoterRegistry.sol    # 选民注册合约（身份管理）
-│   ├── MerkleVerifier.sol   # Merkle 树验证合约
+│   ├── Voting.sol           # 主投票合约（选举、选民注册、投票、计票）
 │   ├── VoteVerifier.sol     # 投票 ZKP Groth16 验证器 (snarkjs 生成)
 │   └── TallyVerifier.sol    # 计票 ZKP Groth16 验证器 (snarkjs 生成)
 │
@@ -116,7 +111,7 @@ ZKP 层:
 │   └── deploy.js            # 合约部署 (Sepolia / localhost)
 │
 ├── test/                    # 智能合约测试 (JavaScript)
-│   ├── Voting.test.js       # 36 个测试，含真实 Groth16 证明
+│   ├── Voting.test.js       # 32 个测试，含真实 Groth16 证明
 │   └── AuditLib.test.js     # Merkle 审计库测试
 │
 ├── tests/                   # Python 测试
@@ -140,7 +135,6 @@ ZKP 层:
 **构造函数**:
 ```solidity
 constructor(
-    address _voterRegistry,
     string memory _title,
     string memory _description,
     address _voteVerifier,
@@ -150,6 +144,7 @@ constructor(
 ```
 
 **关键功能**:
+- `registerVoter(addr)` / `registerVotersBatch(addrs[])`: 注册选民（仅管理员）
 - `addCandidates(name0, name1)`: 一次性添加两个候选人（仅 Created 阶段）
 - `addCandidate(name)`: 单个添加候选人（仅用于测试异常场景）
 - `startElection()`: 启动选举
@@ -230,7 +225,7 @@ JavaScript 实现: `frontend/lib/elgamal.js`
 1. **投票隐私**: ElGamal 加密 + ZKP (无需揭示投票内容)
 2. **投票合法性**: ZKP1+ZKP2 证明 one-hot 编码正确（不能投多票/假票）
 3. **计票正确性**: ZKP3 证明解密过程正确
-4. **防重复投票**: VoterRegistry 白名单 + 合约状态检查
+4. **防重复投票**: Voting.sol 内置选民白名单 + 合约状态检查
 5. **防篡改**: 区块链不可篡改 + Merkle 树验证完整性
 
 ---
@@ -273,7 +268,7 @@ npx hardhat run scripts/deploy.js --network sepolia
 ### 测试
 
 ```bash
-# 智能合约测试 (36 个测试，含真实 Groth16 证明)
+# 智能合约测试 (32 个测试，含真实 Groth16 证明)
 npx hardhat test
 
 # Python ElGamal 测试 (43 个测试)
