@@ -662,7 +662,6 @@
     <script src="lib/audit.js"></script>
     <script>
         const VOTING_ADDRESS = CONTRACT_CONFIG.VOTING_ADDRESS;
-        const VOTER_REGISTRY_ADDRESS = CONTRACT_CONFIG.VOTER_REGISTRY_ADDRESS;
 
         const VOTING_ABI = [
             "function getElectionInfo() view returns (string, string, uint8, uint256, uint256)",
@@ -670,15 +669,12 @@
             "function castVote(bytes32, bytes32, uint256[2], uint256[2][2], uint256[2], uint256[])",
             "function getVoteRecord(address) view returns (bytes32, bytes32, uint256, bool)",
             "function getElgamalPK() view returns (uint256[2])",
-            "function getAllCandidates() view returns (tuple(uint256 id, string name, uint256 voteCount)[])"
-        ];
-
-        const VOTER_REGISTRY_ABI = [
+            "function getAllCandidates() view returns (tuple(uint256 id, string name, uint256 voteCount)[])",
             "function isRegistered(address) view returns (bool)",
             "function hasVoted(address) view returns (bool)"
         ];
 
-        let provider, signer, votingContract, voterRegistryContract, currentAccount;
+        let provider, signer, votingContract, currentAccount;
         let selectedCandidate = null;
         let candidates = [];
         let elgamal = null;
@@ -871,7 +867,6 @@
 
                 signer = await provider.getSigner();
                 votingContract = new ethers.Contract(VOTING_ADDRESS, VOTING_ABI, signer);
-                voterRegistryContract = new ethers.Contract(VOTER_REGISTRY_ADDRESS, VOTER_REGISTRY_ABI, provider);
 
                 document.getElementById('walletStatus').textContent = '已连接';
                 document.getElementById('walletStatus').classList.add('connected');
@@ -966,8 +961,8 @@
                 statusEl.className = 'stat-val' + (status === 1 ? ' active' : status === 0 ? ' warning' : '');
                 document.getElementById('totalVotes').textContent = totalVotes;
 
-                const isRegistered = await voterRegistryContract.isRegistered(currentAccount);
-                const hasVoted = await voterRegistryContract.hasVoted(currentAccount);
+                const isRegistered = await votingContract.isRegistered(currentAccount);
+                const hasVoted = await votingContract.hasVoted(currentAccount);
                 addLog(`选民状态: ${isRegistered ? '已注册' : '未注册'}, ${hasVoted ? '已投票' : '未投票'}`, 'info');
 
                 document.getElementById('notRegisteredAlert').style.display = isRegistered ? 'none' : 'block';
