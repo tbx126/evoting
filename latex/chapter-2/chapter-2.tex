@@ -44,15 +44,123 @@ A limitation is that tally decryption usually remains dependent on one key holde
 
 \section{Zero-Knowledge Proofs in Voting}
 
-Modern zk-SNARK constructions allow concise proofs that arithmetic constraints are satisfied without revealing witness data. Groth16 is widely used in blockchain contexts because proof verification on-chain is efficient and proof size is constant \cite{groth2016}. Circom/snarkjs provides an implementation pipeline for circuit design, witness generation, and verifier artifact export \cite{circomdocs,snarkjs}.
+A zero-knowledge proof (ZKP) is a cryptographic protocol in which a prover convinces a verifier that a statement is true without disclosing any information beyond the statement's truth itself \cite{goldwasser1989}. In e-voting, this capability is foundational: a voter must prove that their ballot is correctly formed---encoding exactly one valid candidate choice---without revealing which candidate was selected; an administrator must prove that a tally is correctly decrypted without revealing the secret key. ZKPs therefore allow public verifiability and ballot privacy to coexist.
 
-In this dissertation, two proof families are used:
+This dissertation uses Groth16, a zk-SNARK (Succinct Non-interactive ARgument of Knowledge), because its on-chain verification cost is fixed regardless of circuit complexity and proof size is constant at three elliptic-curve points \cite{groth2016}. Circom and snarkjs provide the implementation pipeline from circuit specification to deployable Solidity verifier contracts \cite{circomdocs,snarkjs}.
+
+\subsection{The Problem ZKPs Address}
+
+Classical proof systems require the witness (secret data) to be transmitted to the verifier. In e-voting this is unacceptable: revealing a candidate index to prove ballot validity destroys ballot secrecy; revealing a decryption key to prove tally correctness collapses key governance.
+
+ZKPs separate the \emph{claim} from the \emph{evidence}. Let $x$ be a public statement and $w$ be a private witness. Define a relation $\mathcal{R}$ such that $(x, w) \in \mathcal{R}$ means ``$w$ is a valid witness for $x$''. A ZKP system allows a prover who knows $w$ to produce a short artifact $\pi$ that convinces any verifier that $(x, w) \in \mathcal{R}$, without $\pi$ leaking any information about $w$.
+
+In this project, two instances of this pattern apply:
 \begin{itemize}
-    \item vote proof: enforces ballot legality and commitment-ciphertext consistency;
-    \item tally proof: enforces decryption correctness and total-vote consistency.
+    \item \textbf{Vote proof}: $x = (\mathit{commitment},\; H_{ct},\; pk_X,\; pk_Y)$ and $w = (\mathit{candidateId},\; \mathit{salt},\; r_0, \dots, r_{N-1})$. The relation $\mathcal{R}$ requires that the commitment is correctly formed from the candidate index and salt, and that the ciphertexts encode the corresponding one-hot vector under the public key.
+    \item \textbf{Tally proof}: $x = (\bar{C1}_0,\; \bar{C2}_0, \dots, \bar{C1}_{N-1},\; \bar{C2}_{N-1},\; \mathbf{results},\; pk_X,\; pk_Y,\; V)$ and $w = sk$. The relation requires that each result entry equals the vote count obtained by correctly decrypting the corresponding aggregated ciphertext under the secret key $sk$.
 \end{itemize}
 
-The design objective is to prevent invalid ballots or fabricated tally claims from being accepted by contract logic.
+\subsection{Formal Security Properties}
+
+A ZKP system must satisfy three properties \cite{goldwasser1989}:
+\begin{enumerate}
+    \item \textbf{Completeness}: If $(x, w) \in \mathcal{R}$, then an honest prover holding $w$ always produces a proof $\pi$ that the verifier accepts. This guarantees that valid ballots and correct tallies are never falsely rejected.
+    \item \textbf{Soundness}: If no valid witness $w$ exists for statement $x$, then no computationally bounded adversary can produce an accepted proof except with negligible probability. This prevents fabricated ballots or incorrect tally claims from being accepted on-chain.
+    \item \textbf{Zero-Knowledge}: A simulator can produce proofs indistinguishable from real proofs without knowing $w$. This formalizes that $\pi$ reveals nothing about $w$ beyond the existence of a valid witness.
+\end{enumerate}
+
+In a zk-SNARK, soundness is computational (relying on cryptographic hardness assumptions), and the non-interactive property replaces the verifier's challenge with a structured reference string derived from a trusted setup.
+
+\subsection{Arithmetic Circuits and R1CS}
+
+Any computation over a finite field $\mathbb{F}_p$ can be expressed as an arithmetic circuit of addition and multiplication gates. A circuit is \emph{satisfiable} if there exists an assignment to all wires (public inputs, private witnesses, and intermediate values) that makes every gate equation hold. This satisfiability problem is encoded as a \emph{Rank-1 Constraint System} (R1CS).
+
+An R1CS consists of $m$ constraints over a witness vector $\mathbf{s} \in \mathbb{F}_p^n$ (which includes public inputs, private witnesses, and intermediate wire values, with $s_0 = 1$ by convention):
+\begin{equation}
+    \langle \mathbf{a}_i,\, \mathbf{s} \rangle \;\cdot\; \langle \mathbf{b}_i,\, \mathbf{s} \rangle \;=\; \langle \mathbf{c}_i,\, \mathbf{s} \rangle, \qquad i = 1, \dots, m
+\end{equation}
+where $\mathbf{a}_i, \mathbf{b}_i, \mathbf{c}_i \in \mathbb{F}_p^n$ are sparse selector vectors derived from the circuit topology. Each multiplication gate contributes one constraint; additions and constant multiplications are absorbed into the selector vectors at no constraint cost.
+
+In circom, the programmer writes constraints in a domain-specific language. The compiler translates them to an \texttt{.r1cs} file (the constraint matrices $A, B, C$) and a WASM witness generator. For this project, the compiled constraint counts are:
+\begin{itemize}
+    \item \texttt{vote\_proof}: 14{,}590 constraints, encoding commitment verification, candidate range checks, one-hot encryption validity, and ciphertext hash binding.
+    \item \texttt{tally\_proof}: 16{,}786 constraints, encoding key-ownership verification, per-candidate decryption correctness, and total-vote sum consistency.
+\end{itemize}
+
+\subsection{QAP Transformation}
+
+Groth16 operates on a polynomial encoding of the R1CS called a \emph{Quadratic Arithmetic Program} (QAP) \cite{gennaro2013}. For each constraint index $i$ and witness index $j$, define polynomials $u_j, v_j, w_j \in \mathbb{F}_p[X]$ by Lagrange interpolation through the point values $u_j(i) = a_{i,j}$, $v_j(i) = b_{i,j}$, $w_j(i) = c_{i,j}$.
+
+The witness $\mathbf{s}$ satisfies all $m$ R1CS constraints if and only if the vanishing polynomial $T(X) = \prod_{i=1}^{m}(X - i)$ divides the polynomial:
+\begin{equation}
+    P(X) \;=\; \Bigl(\sum_j s_j\, u_j(X)\Bigr) \cdot \Bigl(\sum_j s_j\, v_j(X)\Bigr) \;-\; \sum_j s_j\, w_j(X)
+\end{equation}
+
+Equivalently, there exists a quotient polynomial $H(X)$ such that:
+\begin{equation}
+    A(X) \cdot B(X) \;-\; C(X) \;=\; H(X) \cdot T(X)
+\end{equation}
+where $A, B, C$ are shorthand for the left, right, and output linear combinations of the witness polynomials. The prover's task is to commit to all polynomials evaluated at a secret point $\tau$, without knowing $\tau$ in the clear. This is achieved through the structured reference string produced in the trusted setup phase.
+
+\subsection{The Groth16 Protocol}
+
+Groth16 implements the QAP argument using bilinear pairings over elliptic curves. Let $\mathbb{G}_1, \mathbb{G}_2$ be groups of prime order $p$ with generators $G_1, G_2$, and let $e: \mathbb{G}_1 \times \mathbb{G}_2 \rightarrow \mathbb{G}_T$ be a non-degenerate bilinear pairing. The protocol has three phases.
+
+\paragraph{Setup.}
+A trusted party samples secrets $(\tau, \alpha, \beta, \gamma, \delta) \overset{\$}{\leftarrow} \mathbb{F}_p^5$ and computes two structured reference strings:
+\begin{itemize}
+    \item \textbf{Proving key} $\mathit{pk}$: contains $\{[\tau^i]_1\}$ for required powers, $\{[u_j(\tau)]_1\}$, $\{[v_j(\tau)]_2\}$, and blinded combinations---tens of thousands of elliptic-curve points for circuits of this scale.
+    \item \textbf{Verification key} $\mathit{vk}$: contains $[\alpha]_1$, $[\beta]_2$, $[\gamma]_2$, $[\delta]_2$, and $\{[(\beta u_j + \alpha v_j + w_j)(\tau)/\gamma]_1\}$ for the public signal indices.
+\end{itemize}
+
+The secrets $(\tau, \alpha, \beta, \gamma, \delta)$ are then irrecoverably destroyed---these are the ``toxic waste'' of the trusted setup. If any value were leaked, an adversary could forge proofs for false statements without possessing a valid witness. This risk motivates the \emph{Powers of Tau} multi-party computation ceremony, in which many independent participants each contribute fresh randomness and prove they discarded their contribution. The final artifact is secure as long as at least one participant acted honestly.
+
+\paragraph{Prove.}
+Given the full witness $\mathbf{s}$ and the proving key, the prover samples random blinding scalars $r, s' \overset{\$}{\leftarrow} \mathbb{F}_p$ and computes a three-element proof $\pi = (\pi_A, \pi_B, \pi_C)$:
+\begin{align}
+    \pi_A &= \bigl[\alpha + A(\tau) + r\delta\bigr]_1 \\
+    \pi_B &= \bigl[\beta + B(\tau) + s'\delta\bigr]_2 \\
+    \pi_C &= \left[\frac{C_{\mathit{priv}}(\tau) + H(\tau)T(\tau)}{\delta}\right]_1 + s' \cdot \pi_A + r \cdot [\beta + B(\tau) + s'\delta]_1 - rs'\cdot[\delta]_1
+\end{align}
+where $[\cdot]_k$ denotes the elliptic-curve point $(\cdot) \cdot G_k$, and $C_{\mathit{priv}}$ denotes the private-witness portion of the $C$ polynomial. The blinding factors $r$ and $s'$ randomize the proof so that different proofs for the same statement are computationally indistinguishable, enforcing the zero-knowledge property.
+
+\paragraph{Verify.}
+The verifier checks a single bilinear pairing equation over the four group elements:
+\begin{equation}
+    e(\pi_A,\; \pi_B) \;=\; e\bigl([\alpha]_1,\; [\beta]_2\bigr) \;\cdot\; e\!\left(\sum_{i=0}^{l} a_i \cdot \mathit{vk}_i,\; [\gamma]_2\right) \;\cdot\; e(\pi_C,\; [\delta]_2)
+\end{equation}
+where $l$ is the number of public inputs, $a_i$ are their values, and $\mathit{vk}_i = [(\beta u_i + \alpha v_i + w_i)(\tau)/\gamma]_1$ are precomputed elements of the verification key. This single equation encodes the correctness of $A(\tau) \cdot B(\tau) = C(\tau) + H(\tau) \cdot T(\tau)$ through the algebraic properties of the pairing, without recomputing the polynomials at $\tau$. A proof is accepted if and only if this equation holds.
+
+\subsection{On-Chain Verification Cost}
+
+The BN254 curve (also called BN128) is natively supported by the EVM as a precompiled contract at address \texttt{0x08} for pairing computations. Under EIP-1108, the gas cost model is:
+\begin{equation}
+    \mathit{gas}_{\mathit{pairing}} = 45{,}000 + 34{,}000 \times k
+\end{equation}
+where $k$ is the number of pairing pairs. The Groth16 verification equation requires $k = 4$ pairs (corresponding to the four terms in the equation above), yielding $45{,}000 + 34{,}000 \times 4 = 181{,}000$ gas for the pairing check alone. Crucially, this cost is \emph{independent of the number of circuit constraints}: a 14{,}590-constraint vote circuit and a 100{,}000-constraint circuit incur identical on-chain verification gas. This property makes Groth16 uniquely suited for complex ZKP computations that must be verified on-chain.
+
+\subsection{Implementation Pipeline}
+
+The implementation follows a four-stage workflow:
+\begin{enumerate}
+    \item \textbf{Circuit specification}: constraints are written in circom using library templates for BabyJubJub arithmetic, Poseidon hashing, and conditional logic. The compiler outputs \texttt{.r1cs} (constraint matrices $A, B, C$) and a WASM witness generator.
+    \item \textbf{Trusted setup}: the Powers of Tau artifact (\texttt{pot16\_final.ptau}) provides a universal SRS supporting up to $2^{16}$ constraints. Circuit-specific phase-2 setup uses snarkjs to specialize the SRS to the particular R1CS, producing the proving key (\texttt{.zkey} file, several megabytes per circuit).
+    \item \textbf{Proof generation}: given public inputs and private witnesses, the WASM generator constructs the full witness vector $\mathbf{s}$; snarkjs then computes $(\pi_A, \pi_B, \pi_C)$ using the proving key. In this project, this step executes in the browser using snarkjs with WASM, taking approximately 3--8 seconds for the vote circuit.
+    \item \textbf{Verifier export}: snarkjs generates a Solidity contract that hard-codes the verification key and implements the pairing-check equation as direct EVM precompile calls, eliminating runtime parsing overhead.
+\end{enumerate}
+
+A key trust property of this pipeline is that the \emph{circuit code is public}: anyone can read \texttt{vote\_proof.circom} and \texttt{tally\_proof.circom}, recompile them, and verify that the resulting R1CS matches the published \texttt{.zkey} artifacts. This auditability---combined with the verifiable Powers of Tau ceremony transcript---means that trust in the system rests on the cryptographic hardness assumptions and the setup ceremony, not on the circuit author's integrity.
+
+\subsection{ZKP Role in This Dissertation}
+
+Three distinct proof instances are deployed, organized into two circuit files:
+\begin{enumerate}
+    \item \textbf{ZKP1 (commitment correctness)}: proves $\mathit{commitment} = \mathsf{Poseidon}(\mathit{candidateId}, \mathit{salt})$ without revealing $\mathit{candidateId}$ or $\mathit{salt}$.
+    \item \textbf{ZKP2 (one-hot validity)}: proves that the submitted ElGamal ciphertexts encrypt precisely the one-hot vector $\mathbf{m}$ consistent with the committed candidate, without revealing $\mathbf{m}$ or the per-component randomness. Because ZKP1 and ZKP2 share witness variables (both depend on $\mathit{candidateId}$), they are compiled into a single \texttt{vote\_proof} circuit. A single proof simultaneously establishes both properties.
+    \item \textbf{ZKP3 (tally decryption correctness)}: proves that the published result vector equals the vote counts extracted from the aggregated ciphertexts decrypted under $sk$, and that $sk$ is consistent with the public key $PK = sk \cdot G$. This circuit is necessarily separate because it operates over the aggregated ciphertext state, which is only defined after all votes have been collected.
+\end{enumerate}
+
+The on-chain verifier contracts (\texttt{VoteVerifier.sol}, \texttt{TallyVerifier.sol}), generated automatically by snarkjs, each implement the pairing-check equation as a pure Solidity function. The main \texttt{Voting} contract calls these verifiers as a mandatory precondition for \texttt{castVote} and \texttt{updateTallyResults} respectively, ensuring that no invalid ballot or fabricated tally claim can be committed to the blockchain.
 
 \section{Commitments, Hashing, and Merkle Auditability}
 
