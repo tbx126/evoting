@@ -27,7 +27,7 @@ Figure \ref{fig:system-architecture} illustrates the implementation layering and
 \begin{tikzpicture}[x=1cm,y=1cm]
     \node[draw, rounded corners, minimum width=11.8cm, minimum height=1.2cm, fill=gray!8] (ui) at (0,0) {Frontend Layer: voter page, admin page, wallet interaction};
     \node[draw, rounded corners, minimum width=11.8cm, minimum height=1.2cm, fill=gray!14] (crypto) at (0,-1.9) {Client Crypto Layer: ElGamal helpers, witness builder, Merkle audit library};
-    \node[draw, rounded corners, minimum width=11.8cm, minimum height=1.2cm, fill=gray!20] (chain) at (0,-3.8) {On-chain Layer: Voting, VoterRegistry, VoteVerifier, TallyVerifier};
+    \node[draw, rounded corners, minimum width=11.8cm, minimum height=1.2cm, fill=gray!20] (chain) at (0,-3.8) {On-chain Layer: Voting (with voter registration), VoteVerifier, TallyVerifier};
     \node[draw, rounded corners, minimum width=11.8cm, minimum height=1.2cm, fill=gray!26] (offchain) at (0,-5.7) {Off-chain Validation Layer: Hardhat tests, Python crypto tests};
 
     \draw[->, thick] (ui) -- (crypto);
@@ -52,7 +52,7 @@ The voting contract is responsible for:
     \item Merkle-root publication for post-election audit.
 \end{itemize}
 
-The voter-registry contract provides registration and one-vote enforcement. Verifier contracts expose on-chain Groth16 verification interfaces.
+Voter registration and one-vote enforcement are handled directly within the Voting contract, eliminating a separate registry dependency. Verifier contracts expose on-chain Groth16 verification interfaces.
 
 \subsection{On-Chain Data Model}
 

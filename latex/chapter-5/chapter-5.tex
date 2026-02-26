@@ -47,7 +47,7 @@ Python tests validate BabyJubJub ElGamal primitives:
 
 At the time of evaluation, the local test baseline was:
 \begin{itemize}
-    \item Hardhat tests: 36 passed.
+    \item Hardhat tests: 32 passed.
     \item Python crypto tests: 43 passed.
 \end{itemize}
 
@@ -66,13 +66,13 @@ To improve reproducibility, this dissertation records a concrete execution snaps
 \toprule
 Suite & Passed & Runtime & Command \\ 
 \midrule
-Hardhat contract/integration tests & 36/36 & about 15 s & \texttt{npm.cmd test} \\ 
+Hardhat contract/integration tests & 32/32 & about 15 s & \texttt{npm.cmd test} \\
 Python cryptography unit tests & 43/43 & 21.31 s & \texttt{python -m pytest tests/ -q} \\ 
 \bottomrule
 \end{tabular}
 \end{table}
 
-Both suites completed with zero failures, for a combined 79 passing tests. This does not prove security in adversarial deployment, but it gives strong evidence that the implementation claims in Chapters 3--4 are executable and internally consistent on a fresh local run.
+Both suites completed with zero failures, for a combined 75 passing tests. This does not prove security in adversarial deployment, but it gives strong evidence that the implementation claims in Chapters 3--4 are executable and internally consistent on a fresh local run.
 
 Table \ref{tab:evaluation-scenarios} provides a scenario-oriented view of what was validated and what evidence was observed.
 
@@ -204,16 +204,14 @@ Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170). 
 \toprule
 Contract & Deployed Size & Notes \\
 \midrule
-\texttt{Voting} & 8{,}498 bytes (8.3 KB) & Main election logic; largest contract \\
-\texttt{VoterRegistry} & 2{,}558 bytes (2.5 KB) & Registration and one-vote enforcement \\
+\texttt{Voting} & 9{,}481 bytes (9.3 KB) & Main election logic with integrated voter registration; largest contract \\
 \texttt{VoteVerifier} & 1{,}658 bytes (1.6 KB) & Groth16 verifier (snarkjs-generated) \\
 \texttt{TallyVerifier} & 2{,}690 bytes (2.6 KB) & Groth16 verifier (snarkjs-generated) \\
-\texttt{MerkleVerifier} & 942 bytes (0.9 KB) & Merkle proof verification \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The total deployed bytecode across all five contracts is 16{,}346 bytes. The Voting contract is the largest at 35\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. The Groth16 verifier contracts are compact because snarkjs generates optimized inline pairing-check code.
+The total deployed bytecode across all three contracts is 13{,}829 bytes. The Voting contract is the largest at 39\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. Merging voter registration into the Voting contract increased its size by 983 bytes while eliminating two separate deployments. The Groth16 verifier contracts are compact because snarkjs generates optimized inline pairing-check code.
 
 \subsection{Scalability Discussion}
 
@@ -281,7 +279,7 @@ Table \ref{tab:reqtrace} maps finer-grained requirements to concrete evidence.
 Requirement Item & Status & Evidence and Notes \\
 \midrule
 On-chain election lifecycle enforcement & Completed & Voting state machine and modifiers in \texttt{contracts/Voting.sol}. \\
-Voter eligibility and one-vote rule & Completed & \texttt{contracts/VoterRegistry.sol} gates voting. \\
+Voter eligibility and one-vote rule & Completed & Voter registration and one-vote logic integrated directly into \texttt{contracts/Voting.sol}. \\
 Ballot confidentiality (no plaintext on-chain) & Completed & Only ciphertext and commitment published; plaintext never stored. \\
 Vote legality proof (range + one-hot) & Completed & \texttt{circuits/vote\_proof.circom} + verifier checks in \texttt{castVote}. \\
 Ciphertext binding to vote proof & Completed (partial binding) & Circuit proves \texttt{ciphertextHash}; event payload binding not fully enforced (see Section 5.8). \\
