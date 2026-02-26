@@ -113,17 +113,11 @@ ZKP 层:
 │
 ├── server.py                # FastAPI 静态文件服务器
 ├── scripts/                 # Hardhat 脚本
-│   ├── deploy.js            # 合约部署 (Sepolia)
-│   ├── deploy-local.js      # 本地一键部署
-│   ├── setup-zkp.sh         # ZKP 构建脚本 (编译电路、生成 zkey)
-│   ├── verify-keypair.js    # 验证 ElGamal 密钥对
-│   ├── interact.js          # 合约交互 CLI
-│   ├── full-demo.js         # 完整投票流程演示
-│   ├── register-voter.js    # 注册选民
-│   └── status.js            # 查看选举状态
+│   └── deploy.js            # 合约部署 (Sepolia / localhost)
 │
 ├── test/                    # 智能合约测试 (JavaScript)
-│   └── Voting.test.js       # 33 个测试，含真实 Groth16 证明
+│   ├── Voting.test.js       # 36 个测试，含真实 Groth16 证明
+│   └── AuditLib.test.js     # Merkle 审计库测试
 │
 ├── tests/                   # Python 测试
 │   └── test_elgamal.py      # 43 个测试，ElGamal 加密/解密/同态
@@ -132,8 +126,7 @@ ZKP 层:
 ├── package.json             # Node.js 依赖
 ├── requirements.txt         # Python 依赖 (FastAPI + pytest)
 ├── start_server.bat         # Windows 一键启动服务器
-├── .env                     # 环境变量（私钥、RPC URL）
-└── .env.example             # 环境变量模板
+└── .env                     # 环境变量（私钥、RPC URL）
 ```
 
 ---
@@ -157,7 +150,8 @@ constructor(
 ```
 
 **关键功能**:
-- `addCandidate(name)`: 添加候选人（仅 Created 阶段）
+- `addCandidates(name0, name1)`: 一次性添加两个候选人（仅 Created 阶段）
+- `addCandidate(name)`: 单个添加候选人（仅用于测试异常场景）
 - `startElection()`: 启动选举
 - `castVote(commitment, ciphertextHash, proof, encryptedVote)`: 提交投票 + ZKP
 - `endElection()`: 结束选举
@@ -176,11 +170,11 @@ Created → Active → Ended → Tallied
 
 ### 2. ZKP 电路 (circom)
 
-#### vote_proof.circom (19,548 约束)
+#### vote_proof.circom (14,590 约束, N=2)
 - **ZKP1**: 证明 commitment = Poseidon(candidateId, salt)
 - **ZKP2**: 证明加密投票是合法的 one-hot 向量（只投给一个候选人）
 
-#### tally_proof.circom (21,704 约束)
+#### tally_proof.circom (16,786 约束, N=2)
 - **ZKP3**: 证明解密结果正确（同态聚合 + ElGamal 解密）
 
 ### 3. 密码学 (ElGamal on BabyJubJub)
@@ -201,7 +195,7 @@ JavaScript 实现: `frontend/lib/elgamal.js`
 ```
 1. 选举创建阶段
    管理员 → 部署合约 (含 ElGamal 公钥)
-         → addCandidate() × N
+         → addCandidates("候选人A", "候选人B")
          → startElection()
 
 2. 投票阶段 (前端浏览器)
@@ -269,7 +263,7 @@ npx hardhat compile
 
 # 3a. 本地开发 (推荐)
 npx hardhat node                              # Terminal 1
-npx hardhat run scripts/deploy-local.js --network localhost  # Terminal 2
+npx hardhat run scripts/deploy.js --network localhost  # Terminal 2
 python -m uvicorn server:app --port 8000  # Terminal 3
 
 # 3b. 部署到 Sepolia
@@ -279,7 +273,7 @@ npx hardhat run scripts/deploy.js --network sepolia
 ### 测试
 
 ```bash
-# 智能合约测试 (33 个测试，含真实 Groth16 证明)
+# 智能合约测试 (36 个测试，含真实 Groth16 证明)
 npx hardhat test
 
 # Python ElGamal 测试 (43 个测试)
@@ -301,7 +295,7 @@ python -m pytest tests/ -v
 **修改 ZKP 电路时**:
 1. Poseidon 支持最多 16 个输入 (circomlib t=17)
 2. 修改电路后需重新: 编译 → trusted setup → 生成验证器合约
-3. 使用 `scripts/setup-zkp.sh` 自动化构建
+3. 使用 `circom` + `snarkjs` 手动构建（setup-zkp.sh 已删除，电路已固定为 N=2）
 
 **修改密码学模块时**:
 1. Python 和 JS 的 ElGamal 实现必须保持一致
@@ -335,5 +329,5 @@ python -m pytest tests/ -v
 
 ---
 
-**最后更新**: 2026-02-11
-**文档版本**: 2.0.0
+**最后更新**: 2026-02-26
+**文档版本**: 2.1.0
