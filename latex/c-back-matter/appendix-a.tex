@@ -3,7 +3,7 @@
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
-\setstretch{2}
+\setstretch{1.5}
 \setlength{\parskip}{0.5\baselineskip}
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
@@ -32,7 +32,7 @@ A standard local run uses three terminals:
 npx hardhat node
 
 # Terminal 2
-npx hardhat run scripts/deploy-local.js --network localhost
+npx hardhat run scripts/deploy.js --network localhost
 
 # Terminal 3
 python -m uvicorn server:app --port 8000
@@ -54,7 +54,7 @@ python -m pytest tests/ -q
 \section{End-to-End Demo Script}
 \begin{enumerate}
     \item On admin page: add two candidates using the \texttt{addCandidates} function (circuits are compiled for $N=2$).
-    \item Register voter addresses.
+    \item Register voter addresses. \textit{Note: in local development mode, the deploy script automatically registers the first five test accounts as voters; manual registration via the admin page is required for testnet or production deployments.}
     \item Start election.
     \item On voter page: connect wallet, select candidate, submit vote. Repeat for multiple voters.
     \item On admin page: end election.
@@ -70,6 +70,7 @@ A successful run produces:
     \item a final tally transaction;
     \item \texttt{audit\_bundle.json} containing Merkle root and proofs;
     \item successful inclusion verification on voter side.
+    \item Note: each on-chain vote record includes a \texttt{counted} field reserved for future use; it remains \texttt{false} in the current implementation.
 \end{itemize}
 
 \endgroup

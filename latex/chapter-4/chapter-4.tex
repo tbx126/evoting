@@ -2,7 +2,7 @@
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
-\setstretch{2}
+\setstretch{1.5}
 \setlength{\parskip}{0.5\baselineskip}
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
@@ -146,15 +146,31 @@ Pytest cases validate curve arithmetic invariants, key generation, encryption/de
 
 \subsection{Engineering Observations}
 
-The dual test stack provides confidence across layers but also reveals integration boundaries. In particular, cross-binding between some off-chain payloads and on-chain checks requires additional hardening, discussed in Chapter 5.
+The dual test stack provides coverage at both the contract protocol layer and the cryptographic primitive layer, giving high confidence in isolated module correctness. However, integration testing revealed several boundary conditions worth noting for future development.
+
+First, the most brittle integration point is the mapping between circuit public signals and Solidity function parameters. Because snarkjs exports proof calldata in a specific encoding, any mismatch in signal ordering between the circuit definition and the contract's expected \texttt{pubSignals} array causes silent proof rejection rather than a descriptive error. This was addressed by careful alignment during circuit compilation, but requires maintenance discipline whenever circuits are recompiled.
+
+Second, browser-side proof generation is resource-intensive. During development, memory pressure caused WASM crashes on devices with less than 4 GB available RAM. The voter interface should therefore include progress indicators and graceful error messages for proof generation failures.
+
+Third, the ElGamal tally decryption relies on bounded discrete-log recovery (baby-step giant-step). If an election receives more votes than the precomputed table bound, decryption silently fails. This bound must be documented and enforced during deployment configuration.
 
 \section{Deployment Notes}
 
-Local deployment uses Hardhat node and static web serving. Public testnet deployment is supported through environment-variable configured RPC and private keys. Dependency on trusted setup artifacts and frontend configuration files is explicitly documented in repository instructions \cite{hardhat,solidity,openzeppelin}.
+Local deployment uses a Hardhat node and a Python-served static frontend. The deployment script (\texttt{scripts/deploy.js}) generates \texttt{frontend/config.js} automatically, which is required before the frontend pages can interact with the deployed contracts.
+
+For testnet or mainnet deployment, the following additional steps apply:
+\begin{itemize}
+    \item Configure \texttt{.env} with the deployer private key and the target network RPC URL before running the deploy script.
+    \item Ensure the \texttt{frontend/zk/} directory contains the compiled WASM witness generators and proving key files (\texttt{.zkey}) corresponding to the deployed verifier contracts.
+    \item Configure MetaMask in the voter and administrator browsers to point to the correct network (chain ID must match the deployment target).
+    \item The trusted setup artifacts (\texttt{build/pot16\_final.ptau} and circuit-specific \texttt{.zkey} files) must be kept consistent with the deployed verifier contracts. Recompiling circuits without redeploying verifiers will cause all proof submissions to fail.
+\end{itemize}
+
+The dependency on trusted setup artifacts and frontend configuration files is explicitly documented in repository instructions \cite{hardhat,solidity,openzeppelin}.
 
 \section{Chapter Summary}
 
-This chapter translated the protocol design into concrete software modules and execution paths. The key result is implementation traceability: every major protocol claim in Chapter 3 is mapped to explicit contract logic, circuit constraints, frontend operations, and automated tests.
+This chapter translated the protocol design into concrete software modules and execution paths. The key result is implementation traceability: every major protocol claim in Chapter 3 is mapped to explicit contract logic, circuit constraints, frontend operations, and automated tests. Chapter 5 evaluates whether this implementation meets the stated requirements, reports performance characteristics, and identifies residual security gaps.
 
 \endgroup
 

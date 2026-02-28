@@ -2,45 +2,39 @@
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
-\setstretch{2}
+\setstretch{1.5}
 \setlength{\parskip}{0.5\baselineskip}
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
 
 \section{Security Requirements of E-Voting}
 
-A credible e-voting system is usually expected to satisfy at least four properties: eligibility control, ballot secrecy, integrity of counting, and auditability. Classical protocol literature further distinguishes between individual verifiability (a voter can verify inclusion), universal verifiability (any observer can verify tally consistency), and receipt-freeness/coercion resistance \cite{benaloh1987,chaum2004,juels2005}.
+A credible e-voting system must satisfy at least four properties: eligibility control, ballot secrecy, integrity of counting, and auditability. Classical protocol literature adds finer distinctions---individual verifiability (a voter confirms their own ballot was counted), universal verifiability (any observer can check tally consistency), and receipt-freeness or coercion resistance \cite{benaloh1994,chaum2004,juels2005}.
 
-In practical deployments, these requirements map to both cryptographic and operational controls. Cryptography can prove that certain relations hold, but it cannot by itself guarantee endpoint security, key governance, or anti-coercion behavior in uncontrolled environments. This distinction is critical when interpreting claims of ``secure voting''.
+In practice, these requirements split across cryptographic and operational controls. Cryptography can confirm that certain relations hold. It cannot, however, guarantee endpoint security, key governance, or anti-coercion behaviour in an uncontrolled environment. That gap matters when reading claims of ``secure voting''.
 
 \section{Centralized E-Voting Systems}
 
-Conventional centralized architectures typically implement the election lifecycle through web services and database transactions. Their strengths include mature tooling, low operational complexity, and straightforward incident response within one trust boundary. Their limitations include:
+Conventional centralized architectures handle the election lifecycle through web services and database transactions. Mature tooling and low operational complexity give these systems a practical edge; incident response also stays inside one trust boundary. The limitations are harder to overlook:
 \begin{itemize}
-    \item privileged insiders can alter records or logs if controls fail;
-    \item independent replay of state transitions is difficult without full data export;
-    \item dispute resolution depends on institutional trust and policy compliance.
+    \item privileged insiders can alter records or logs if access controls slip;
+    \item replaying state transitions independently requires a full data export, which is not always available;
+    \item dispute resolution falls back on institutional trust rather than any verifiable record.
 \end{itemize}
 
-These limitations motivate replacing trust-in-operator with trust-in-protocol where possible.
+These gaps motivate replacing trust-in-operator with trust-in-protocol.
 
 \section{Blockchain-Based Voting Approaches}
 
-Blockchain infrastructures provide immutable append-only logs and deterministic execution rules \cite{nakamoto2008,wood2014}. For voting, this allows transparent publication of election state transitions and event traces. Smart contracts can enforce lifecycle invariants directly, reducing hidden backend behavior.
+Blockchain infrastructures maintain immutable append-only logs with deterministic execution rules \cite{nakamoto2008,wood2014}. Election state transitions and event traces are transparently recorded. Smart contracts enforce lifecycle invariants directly---there is no hidden backend to trust.
 
-However, blockchain transparency introduces a privacy challenge. If vote semantics are posted in plaintext or trivially reversible form, confidentiality is permanently compromised. Therefore, privacy-preserving blockchain voting must combine ledger transparency for control flow with cryptographic concealment for ballot content.
+Transparency cuts both ways, though. If vote semantics appear in plaintext, confidentiality is permanently lost. A privacy-preserving blockchain voting system must therefore pair ledger transparency for control flow with cryptographic concealment for ballot content.
 
 \section{Homomorphic Encryption for Private Tally}
 
-ElGamal encryption on discrete-log groups supports additive homomorphism over encoded messages \cite{elgamal1985}. For voting, each ballot can be encoded as a one-hot vector; component-wise aggregation of ciphertexts yields encrypted candidate totals. Decrypting only the aggregates avoids exposing individual ballots.
+ElGamal encryption on discrete-log groups supports additive homomorphism over encoded messages \cite{elgamal1985}. Each ballot is encoded as a one-hot vector; component-wise aggregation of ciphertexts gives encrypted candidate totals. Decrypting only the aggregates avoids exposing individual ballots.
 
-This pattern has two practical advantages in e-voting:
-\begin{itemize}
-    \item tallying cost is linear in vote count with simple point operations;
-    \item privacy is maintained as long as secret-key exposure and plaintext side channels are controlled.
-\end{itemize}
-
-A limitation is that tally decryption usually remains dependent on one key holder unless threshold schemes are added.
+Two practical advantages follow. Tallying cost scales linearly with vote count using simple point operations. Privacy holds as long as secret-key exposure and plaintext side channels stay controlled---a weaker guarantee than threshold decryption, but achievable without ceremony infrastructure.
 
 \section{Zero-Knowledge Proofs in Voting}
 
@@ -56,8 +50,20 @@ ZKPs separate the \emph{claim} from the \emph{evidence}. Let $x$ be a public sta
 
 In this project, two instances of this pattern apply:
 \begin{itemize}
-    \item \textbf{Vote proof}: $x = (\mathit{commitment},\; H_{ct},\; pk_X,\; pk_Y)$ and $w = (\mathit{candidateId},\; \mathit{salt},\; r_0, \dots, r_{N-1})$. The relation $\mathcal{R}$ requires that the commitment is correctly formed from the candidate index and salt, and that the ciphertexts encode the corresponding one-hot vector under the public key.
-    \item \textbf{Tally proof}: $x = (\bar{C1}_0,\; \bar{C2}_0, \dots, \bar{C1}_{N-1},\; \bar{C2}_{N-1},\; \mathbf{results},\; pk_X,\; pk_Y,\; V)$ and $w = sk$. The relation requires that each result entry equals the vote count obtained by correctly decrypting the corresponding aggregated ciphertext under the secret key $sk$.
+    \item \textbf{Vote proof}: the public statement and witness are
+    \begin{gather*}
+    x = (\mathit{commitment},\; H_{ct},\; pk_X,\; pk_Y) \\
+    w = (\mathit{candidateId},\; \mathit{salt},\; r_0, \dots, r_{N-1})
+    \end{gather*}
+    The relation $\mathcal{R}$ requires that the commitment is correctly formed from the candidate index and salt, and that the ciphertexts encode the corresponding one-hot vector under the public key.
+    \item \textbf{Tally proof}: $w = sk$, with public statement
+    \begin{equation*}
+        \begin{split}
+        x = (&pk_X,\; pk_Y,\; \bar{C1}^{X}_0,\; \bar{C1}^{Y}_0,\; \dots,\; \bar{C2}^{X}_{N-1},\; \bar{C2}^{Y}_{N-1},\\
+             &R^{X}_0,\; R^{Y}_0,\; \dots,\; R^{X}_{N-1},\; R^{Y}_{N-1},\; V)
+        \end{split}
+    \end{equation*}
+    where $R^{X}_j$, $R^{Y}_j$ are the coordinates of the result point $\mathbf{results}[j] \cdot G$ for candidate $j$.
 \end{itemize}
 
 \subsection{Formal Security Properties}
@@ -93,7 +99,10 @@ Groth16 operates on a polynomial encoding of the R1CS called a \emph{Quadratic A
 
 The witness $\mathbf{s}$ satisfies all $m$ R1CS constraints if and only if the vanishing polynomial $T(X) = \prod_{i=1}^{m}(X - i)$ divides the polynomial:
 \begin{equation}
-    P(X) \;=\; \Bigl(\sum_j s_j\, u_j(X)\Bigr) \cdot \Bigl(\sum_j s_j\, v_j(X)\Bigr) \;-\; \sum_j s_j\, w_j(X)
+\begin{split}
+    P(X) \;=\; &\Bigl(\sum_j s_j\, u_j(X)\Bigr) \cdot \Bigl(\sum_j s_j\, v_j(X)\Bigr) \\
+               &-\; \sum_j s_j\, w_j(X)
+\end{split}
 \end{equation}
 
 Equivalently, there exists a quotient polynomial $H(X)$ such that:
@@ -120,7 +129,8 @@ Given the full witness $\mathbf{s}$ and the proving key, the prover samples rand
 \begin{align}
     \pi_A &= \bigl[\alpha + A(\tau) + r\delta\bigr]_1 \\
     \pi_B &= \bigl[\beta + B(\tau) + s'\delta\bigr]_2 \\
-    \pi_C &= \left[\frac{C_{\mathit{priv}}(\tau) + H(\tau)T(\tau)}{\delta}\right]_1 + s' \cdot \pi_A + r \cdot [\beta + B(\tau) + s'\delta]_1 - rs'\cdot[\delta]_1
+    \pi_C &= \left[\frac{C_{\mathit{priv}}(\tau) + H(\tau)T(\tau)}{\delta}\right]_1 + s' \cdot \pi_A \\
+          &\quad + r \cdot \bigl[\beta + B(\tau) + s'\delta\bigr]_1 - rs' \cdot [\delta]_1 \notag
 \end{align}
 where $[\cdot]_k$ denotes the elliptic-curve point $(\cdot) \cdot G_k$, and $C_{\mathit{priv}}$ denotes the private-witness portion of the $C$ polynomial. The blinding factors $r$ and $s'$ randomize the proof so that different proofs for the same statement are computationally indistinguishable, enforcing the zero-knowledge property.
 
@@ -157,7 +167,7 @@ Three distinct proof instances are deployed, organized into two circuit files:
 \begin{enumerate}
     \item \textbf{ZKP1 (commitment correctness)}: proves $\mathit{commitment} = \mathsf{Poseidon}(\mathit{candidateId}, \mathit{salt})$ without revealing $\mathit{candidateId}$ or $\mathit{salt}$.
     \item \textbf{ZKP2 (one-hot validity)}: proves that the submitted ElGamal ciphertexts encrypt precisely the one-hot vector $\mathbf{m}$ consistent with the committed candidate, without revealing $\mathbf{m}$ or the per-component randomness. Because ZKP1 and ZKP2 share witness variables (both depend on $\mathit{candidateId}$), they are compiled into a single \texttt{vote\_proof} circuit. A single proof simultaneously establishes both properties.
-    \item \textbf{ZKP3 (tally decryption correctness)}: proves that the published result vector equals the vote counts extracted from the aggregated ciphertexts decrypted under $sk$, and that $sk$ is consistent with the public key $PK = sk \cdot G$. This circuit is necessarily separate because it operates over the aggregated ciphertext state, which is only defined after all votes have been collected.
+    \item \textbf{ZKP3 (tally decryption correctness)}: proves that for each candidate $j$, the published result point $\mathbf{results}[j] \cdot G$ equals the point obtained by decrypting the aggregated ciphertext under $sk$, and that $sk$ is consistent with the public key $PK = sk \cdot G$. The integer vote counts are derived off-chain from these curve points via discrete-log recovery, and are submitted to the contract separately; the circuit proves the correctness of the curve-point representations, not the integer values directly. This circuit is necessarily separate because it operates over the aggregated ciphertext state, which is only defined after all votes have been collected.
 \end{enumerate}
 
 The on-chain verifier contracts (\texttt{VoteVerifier.sol}, \texttt{TallyVerifier.sol}), generated automatically by snarkjs, each implement the pairing-check equation as a pure Solidity function. The main \texttt{Voting} contract calls these verifiers as a mandatory precondition for \texttt{castVote} and \texttt{updateTallyResults} respectively, ensuring that no invalid ballot or fabricated tally claim can be committed to the blockchain.

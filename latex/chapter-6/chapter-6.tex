@@ -3,18 +3,22 @@
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
-\setstretch{2}
+\setstretch{1.5}
 \setlength{\parskip}{0.5\baselineskip}
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
 
 \section{Conclusions}
 
-This dissertation implemented a blockchain-based e-voting system that integrates (i) homomorphic encryption for confidential ballots, (ii) Groth16 zero-knowledge proofs for vote and tally correctness, and (iii) commitment-based Merkle auditability for anonymous voter-side inclusion checks.
+This dissertation implemented and evaluated a blockchain-based e-voting system in which privacy and verifiability are enforced by cryptographic protocol rather than by institutional trust. The core architecture combines three mechanisms: homomorphic ElGamal encryption on BabyJubJub for ballot confidentiality, Groth16 zero-knowledge proofs for vote legality and tally correctness, and commitment-based Merkle inclusion proofs for anonymous voter-side auditability.
 
-The principal engineering result is that a working pipeline can be built using mainstream Ethereum tooling and open-source ZKP frameworks, while preserving key security properties at the protocol layer. Votes are validated on-chain via proof verification; tally claims are accompanied by decryption correctness proofs; and voters can verify inclusion using local receipts without address-based lookup.
+The principal engineering result is that all three mechanisms can be integrated into a coherent, browser-to-chain workflow using mainstream tooling: Circom and snarkjs for circuit development, Hardhat and Solidity for contract deployment, and standard Web3 wallet APIs for voter interaction. Crucially, this integration does not require a trusted middleware layer---vote proof verification occurs entirely on-chain, and tally correctness is publicly attested by the submitted ZKP3 proof.
 
-From a requirement standpoint, the prototype satisfies the core functional requirements of confidentiality and verifiability. At the same time, code review reveals several hardening gaps that must be addressed before describing the system as production-ready. These gaps are explicitly documented to ensure the dissertation reports security claims conservatively and accurately.
+From a research perspective, the system addresses RQ1 by demonstrating that encrypted one-hot ballots and ZKP-based checks are technically feasible in a browser-to-chain pipeline without trusted middleware. It addresses RQ2 by showing that the combination of on-chain proof verification and receipt-based anonymous auditability provides verifiability that is structurally stronger than centralized log-based auditing: observers do not need to trust the operator's claim of correctness, only the cryptographic assumptions underlying the proof system. For RQ3, the gap analysis in Chapter 5 identifies five specific engineering issues that must be resolved before the prototype can be described as production-ready.
+
+The evaluation confirmed 75 automated tests passing---32 Hardhat contract and integration tests and 43 Python cryptographic unit tests---providing a reproducible baseline for future development. Performance measurements show that on-chain costs are dominated by Groth16 verification (approximately 181,000 gas for the pairing check), and that the system is practically viable for small-to-medium elections at current Ethereum gas parameters.
+
+Taken together, the implementation represents a functional, testable, and honest research prototype: it achieves its stated privacy and verifiability goals, documents its residual gaps explicitly, and provides a clear engineering path toward higher-assurance deployment.
 
 \section{Completion Assessment Against Project Statement}
 

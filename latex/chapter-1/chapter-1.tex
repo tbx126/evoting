@@ -2,58 +2,56 @@
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
-\setstretch{2}
+\setstretch{1.5}
 \setlength{\parskip}{0.5\baselineskip}
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
 
-Electronic voting has long been positioned as a modernization path for democratic processes, especially in scenarios requiring rapid tallying, remote participation, and auditable outcomes. Yet, real deployment remains difficult because election systems must satisfy several properties that are usually in tension: confidentiality of individual ballots, integrity of election state transitions, universal verifiability of counting logic, and practical usability for both administrators and voters.
+Electronic voting promises faster tallies, broader access, and auditable records---advantages that have kept it on the reform agenda for decades. Getting it right, however, has proved harder than the promise suggests. A credible system must simultaneously guarantee ballot secrecy, enforce correct state transitions, expose enough for independent verification, and remain usable for both administrators and voters. These demands pull against each other, and that tension is where most practical deployments run into trouble.
 
-Traditional centralized e-voting platforms often satisfy usability and operational speed, but they rely on a trusted operator to maintain backend logs, enforce state transitions, and publish correct tally outputs. In this trust model, independent verification by voters and third-party auditors is limited by what the operator chooses to expose. Once the system is disputed, root-cause analysis frequently depends on privileged data access rather than protocol-level guarantees.
+Centralized e-voting platforms handle usability and speed well enough, but they shift the burden of trust onto whoever runs the backend. That operator controls the logs, enforces state transitions, and publishes the tally---and independent verification only goes as far as what they choose to share. When a result is contested, investigation typically stalls at the boundary of privileged access rather than resolving through any publicly verifiable mechanism.
 
-This dissertation studies a concrete alternative: a blockchain-based e-voting architecture that combines on-chain state-machine enforcement with privacy-preserving cryptography. The project integrates homomorphic ElGamal encryption, Groth16 zero-knowledge proof verification, and commitment-based Merkle inclusion proofs into one end-to-end pipeline. The goal is not merely theoretical correctness, but an implementation that can be executed, tested, and reviewed as a working engineering artifact.
+This dissertation takes a different path: a blockchain-based architecture that replaces operator trust with on-chain enforcement and cryptographic guarantees. ElGamal homomorphic encryption, Groth16 zero-knowledge proofs, and commitment-based Merkle inclusion proofs are combined into a single end-to-end pipeline. The aim is not a theoretical sketch but a working system---one that can be compiled, deployed, tested, and independently reviewed.
 
 \section{Problem Statement}
 
-The central problem is how to construct a voting protocol that supports all of the following in a deployable system:
+Building a voting system that does not depend on trusted operators means satisfying a set of requirements that do not all point in the same direction:
 \begin{itemize}
-    \item ballot confidentiality during submission, storage, and tally;
-    \item correctness checks for vote formation and tally claims without revealing vote contents;
-    \item tamper-evident election lifecycle management;
-    \item voter-side verification that does not require disclosing identity or wallet address.
+    \item ballot confidentiality across submission, storage, and counting;
+    \item correctness checks on vote formation and tally claims that do not reveal ballot contents;
+    \item tamper-evident enforcement of election state transitions;
+    \item a voter verification path that requires no disclosure of identity or wallet address.
 \end{itemize}
 
-In formal terms, let $V$ denote the number of cast ballots and $N$ denote the number of candidates. The protocol must ensure that each accepted ballot encodes exactly one valid candidate choice, aggregate ciphertexts can be tallied consistently, and the published result vector is accompanied by cryptographic evidence sufficient for independent validation.
+Let $V$ be the number of cast ballots and $N$ the number of candidates. Every accepted ballot must encode exactly one valid choice, the aggregate ciphertexts must yield a consistent tally, and the published result must come with cryptographic evidence that anyone can check independently.
 
 \section{Motivation}
 
-Three observations motivate this work.
+Several practical developments make this combination of techniques worth pursuing. Blockchain ledgers maintain append-only event logs with deterministic execution, removing one class of attack---silent rewrites of election state---that centralized backends remain vulnerable to \cite{nakamoto2008,wood2014}. Modern zk-SNARK systems have reached the point where proof sizes are small and on-chain verification fits within smart-contract budgets \cite{groth2016}. Circuit-friendly hash functions and Merkle structures add post-election inclusion checks that scale to large ballot sets without expensive on-chain storage \cite{poseidon2019,merkle1988}.
 
-First, blockchain ledgers provide append-only event logs and deterministic contract execution semantics, reducing the attack surface for silent state rewrites \cite{nakamoto2008,wood2014}. Second, modern zk-SNARK systems provide practical proof sizes and on-chain verification costs compatible with smart-contract workflows \cite{groth2016}. Third, circuit-friendly hash functions and Merkle structures enable lightweight post-election inclusion checks for large ballot sets \cite{poseidon2019,merkle1988}.
-
-The combination of these properties suggests a practical design space where privacy and verifiability can be treated as co-equal requirements rather than trade-offs resolved by institutional trust.
+Taken together, these tools open up a design space where privacy and verifiability no longer need to be traded off against each other, and neither depends on institutional promises to hold.
 
 \section{Research Objectives}
 
-This dissertation has five concrete objectives:
-\begin{enumerate}
-    \item design a contract-level election state machine with explicit lifecycle constraints;
-    \item implement private ballot casting using one-hot ElGamal encryption on BabyJubJub;
-    \item enforce vote legality and tally correctness through Groth16 proof verification;
-    \item implement an anonymous voter audit path through commitment receipts and Merkle proofs;
-    \item evaluate requirement completion against the project brief and identify remaining hardening gaps.
-\end{enumerate}
+The work targets five outcomes:
+\begin{itemize}
+    \item a contract-level state machine enforcing explicit lifecycle transitions on the election;
+    \item private ballot submission via one-hot ElGamal encryption on BabyJubJub;
+    \item Groth16 proofs checking vote legality and tally correctness on-chain;
+    \item an anonymous path to confirm ballot inclusion---just a receipt and a Merkle proof, no identity needed;
+    \item an honest look at what the implementation gets right and where it comes up short.
+\end{itemize}
 
 \section{Research Questions}
 
-The implementation and evaluation are organized around the following questions:
+Three questions shape how the implementation is built and assessed:
 \begin{itemize}
-    \item \textbf{RQ1}: Can encrypted one-hot ballots and ZKP-based checks be integrated into a browser-to-chain workflow without trusted middleware?
-    \item \textbf{RQ2}: Does the resulting pipeline provide verifiability that is stronger than centralized log-based auditing?
-    \item \textbf{RQ3}: Which security guarantees are already achieved in code, and which remain partially satisfied due to engineering gaps?
+    \item \textbf{RQ1}: Is it feasible to integrate encrypted one-hot ballots and ZKP-based checks into a browser-to-chain workflow without relying on trusted middleware?
+    \item \textbf{RQ2}: Does the resulting pipeline offer stronger verifiability than centralized log-based auditing?
+    \item \textbf{RQ3}: Of the target security guarantees, which are fully realized in the current code, and which fall short due to specific engineering gaps?
 \end{itemize}
 
-Table \ref{tab:rq-mapping} maps each research question to the main validation locus in this dissertation.
+Table \ref{tab:rq-mapping} maps each question to where it is evaluated.
 
 \begin{table}[htbp]
 \centering
@@ -79,21 +77,21 @@ Out-of-scope items include coercion resistance, threshold decryption ceremonies,
 
 \section{Contributions}
 
-This dissertation contributes the following:
+The work produces five concrete outputs:
 \begin{itemize}
-    \item an executable cross-stack architecture connecting Solidity contracts, Circom circuits, JavaScript frontend proving, and Python cryptographic validation;
-    \item a vote-submission mechanism that binds commitment and ciphertext hash into public proof signals;
-    \item a tally pipeline that integrates homomorphic aggregation, ZKP3 verification, and Merkle-root publication;
-    \item an anonymous verification procedure in which the voter proves ballot inclusion using only receipt material and an exported audit bundle;
-    \item a requirement-driven completion assessment with explicit unresolved risks.
+    \item a cross-stack prototype---Solidity contracts, Circom circuits, browser-side JavaScript proving, and Python cryptographic validation---compiled, deployed, and independently testable;
+    \item a vote-submission mechanism binding the Poseidon commitment and ciphertext hash as public proof signals;
+    \item a tally pipeline that runs homomorphic aggregation and ZKP3 verification, then publishes a Merkle root derived from on-chain commitments;
+    \item a post-election audit path where voters confirm ballot inclusion from a local receipt and an exported bundle, without any address-based lookup;
+    \item a requirement-driven gap assessment that names unresolved risks explicitly rather than folding them into general limitations.
 \end{itemize}
 
 \section{Dissertation Structure}
 
-Chapter 2 reviews prior work and cryptographic foundations. Chapter 3 defines the system model, protocol flow, and security assumptions. Chapter 4 details implementation decisions and module-level behavior. Chapter 5 reports evaluation outcomes, performance measurements, requirement traceability, and risk analysis. Chapter 6 concludes and proposes a prioritized hardening roadmap.
+Chapter 2 surveys prior work and builds the cryptographic foundations the protocol relies on. Chapter 3 then defines the system model, the protocol flow, and the trust assumptions underlying both. Implementation decisions and module-level behaviour are covered in Chapter 4. Chapter 5 reports evaluation outcomes---performance measurements, requirement traceability, and a risk analysis. Chapter 6 concludes and lays out a prioritized hardening roadmap.
 
 \section{Chapter Summary}
 
-This chapter established the dissertation problem context, defined explicit research questions, and set realistic scope boundaries for interpreting security claims. It also introduced contribution statements that are later validated against implementation and evaluation evidence.
+This chapter set out the problem context, pinned down three research questions, and drew the scope boundaries that govern how security claims should be read. The contributions were also stated here; they are validated against implementation and evaluation evidence in later chapters. Chapter 2 positions this work in the broader e-voting and cryptographic literature, then develops the theoretical foundations---Groth16 in particular---that the protocol design in Chapter 3 builds on.
 
 \endgroup

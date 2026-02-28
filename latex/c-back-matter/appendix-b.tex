@@ -3,7 +3,7 @@
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
-\setstretch{2}
+\setstretch{1.5}
 \setlength{\parskip}{0.5\baselineskip}
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
@@ -44,13 +44,13 @@ Verification avoids address-based lookup of vote records & Completed (operationa
 \end{table}
 
 \section{Open Issues and Hardening Tasks}
-The following tasks remain for full high-assurance completion:
+The following tasks remain for full high-assurance completion. These are discussed in detail---with priority classification---in Chapter~5, Section~5.8. They are reproduced here for checklist reference:
 \begin{enumerate}
-    \item Bind the submitted integer result vector to the ZKP public signals validated by the tally proof.
-    \item Enforce ciphertext payload integrity binding between emitted events and on-chain ciphertext hash.
-    \item Compare audit bundle root with on-chain \texttt{merkleRoot} during voter verification.
-    \item Align candidate cardinality between circuits and contract logic.
-    \item Lifecycle-gate or remove unrestricted Merkle-root overwrite operation.
+    \item \textbf{[P1]} Bind the submitted integer result vector to the ZKP public signals validated by the tally proof.
+    \item \textbf{[P1]} Enforce ciphertext payload integrity binding between emitted events and on-chain ciphertext hash.
+    \item \textbf{[P1]} Compare audit bundle root with on-chain \texttt{merkleRoot} during voter verification.
+    \item \textbf{[P2]} Align candidate cardinality between circuits and contract logic.
+    \item \textbf{[P2]} Lifecycle-gate or remove unrestricted Merkle-root overwrite operation.
 \end{enumerate}
 
 \section{Interpretation}

@@ -2,7 +2,7 @@
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
-\setstretch{2}
+\setstretch{1.5}
 \setlength{\parskip}{0.5\baselineskip}
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
@@ -66,7 +66,7 @@ To improve reproducibility, this dissertation records a concrete execution snaps
 \toprule
 Suite & Passed & Runtime & Command \\ 
 \midrule
-Hardhat contract/integration tests & 32/32 & about 15 s & \texttt{npm.cmd test} \\
+Hardhat contract/integration tests & 32/32 & about 36 s & \texttt{npm test} \\
 Python cryptography unit tests & 43/43 & 21.31 s & \texttt{python -m pytest tests/ -q} \\ 
 \bottomrule
 \end{tabular}
@@ -183,11 +183,11 @@ Operation & Estimated Gas & Dominant Cost Component \\
 \end{tabular}
 \end{table}
 
-To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.0096--0.0102~ETH (\$24--\$26), and one \texttt{updateTallyResults} costs approximately 0.0093--0.0099~ETH (\$23--\$25). The Ethereum block gas limit (30M gas) can accommodate roughly 88--95 vote transactions per block if they were the only transactions, although in practice, block space is shared.
+To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.0096--0.0102~ETH (\$24--\$26), and one \texttt{updateTallyResults} costs approximately 0.0093--0.0099~ETH (\$23--\$25). The Ethereum block gas limit (30M gas) can accommodate roughly 88--95 vote transactions per block if they were the only transactions, although in practice, block space is shared. (Gas price and ETH price figures are illustrative values used at the time of evaluation; actual costs vary with network conditions.)
 
 \subsection{Proof Generation Latency}
 
-Groth16 proof generation is the most computationally intensive client-side operation. It involves multi-scalar multiplication over the proving key, which scales with the number of circuit constraints. For the current configuration ($N = 2$), the project test suite reports proof generation times of approximately 3--8 seconds per vote proof and 4--10 seconds per tally proof when executed in Node.js (snarkjs, single-threaded). Browser-based execution using snarkjs WASM is expected to exhibit similar or moderately longer latencies depending on device hardware.
+Groth16 proof generation is the most computationally intensive client-side operation. It involves multi-scalar multiplication over the proving key, which scales with the number of circuit constraints. For the current configuration ($N = 2$), the project test suite reports proof generation times of approximately 3--8 seconds per vote proof and 4--10 seconds per tally proof when executed in Node.js (snarkjs, single-threaded) on a mid-range laptop (Intel Core i7, 16 GB RAM). Browser-based execution using snarkjs WASM is expected to exhibit similar or moderately longer latencies depending on device hardware.
 
 These times are acceptable for a prototype where voters submit one ballot per election. However, they represent a usability consideration: the voter interface should communicate proof-generation progress to avoid the impression of an unresponsive application.
 
@@ -340,13 +340,13 @@ Residual risks arise primarily from key custody and client environment. Even wit
 
 \section{Outstanding Engineering Gaps and Their Impact}
 
-Code review identified gaps that are important for full assurance:
+Code review identified five gaps that affect full assurance. Gaps are classified by impact: \textbf{P1} (high impact, fix before any public deployment) and \textbf{P2} (medium impact, fix before production use):
 \begin{itemize}
-    \item \textbf{Result binding gap}: contract verifies tally proof but does not strictly bind the submitted integer result vector to all public signals used by the circuit. This can allow inconsistencies if external checks are not enforced.
-    \item \textbf{Ciphertext event binding gap}: the emitted encrypted payload is not fully bound to on-chain stored ciphertext hash. If an attacker can influence event payload parsing or indexing, off-chain tally can be poisoned.
-    \item \textbf{Audit root cross-check gap}: voter-side inclusion verification should compare bundle root with on-chain stored root to prevent acceptance of a self-consistent but unauthorized bundle.
-    \item \textbf{Candidate cardinality mismatch}: circuits are compiled for two candidates while contract permits dynamic candidate count; deploying with more than two candidates will cause proof verification failures.
-    \item \textbf{Merkle root mutability}: a direct root-update function exists without strict lifecycle gating; this increases governance attack surface.
+    \item \textbf{[P1] Result binding gap}: contract verifies tally proof but does not strictly bind the submitted integer result vector to all public signals used by the circuit. This can allow inconsistencies if external checks are not enforced.
+    \item \textbf{[P1] Ciphertext event binding gap}: the emitted encrypted payload is not fully bound to on-chain stored ciphertext hash. If an attacker can influence event payload parsing or indexing, off-chain tally can be poisoned.
+    \item \textbf{[P1] Audit root cross-check gap}: voter-side inclusion verification should compare bundle root with on-chain stored root to prevent acceptance of a self-consistent but unauthorized bundle.
+    \item \textbf{[P2] Candidate cardinality mismatch}: circuits are compiled for two candidates while contract permits dynamic candidate count; deploying with more than two candidates will cause proof verification failures.
+    \item \textbf{[P2] Merkle root mutability}: a direct root-update function exists without strict lifecycle gating; this increases governance attack surface.
 \end{itemize}
 
 These issues do not invalidate the prototype's educational value or end-to-end demonstration, but they prevent claiming full compliance with ``fully functional'' in a high-assurance sense.

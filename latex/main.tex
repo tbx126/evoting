@@ -33,9 +33,11 @@
 
 % ================================= Equations ================================
 \AtBeginEnvironment{equation}{\setstretch{1}}             % single spacing for equations
+\AtBeginEnvironment{align}{\setstretch{1}}                % single spacing for align equations
+\AtBeginEnvironment{align*}{\setstretch{1}}               % single spacing for unnumbered align
 \AtEndEnvironment{equation}{}                             % restore after equation
-\numberwithin{equation}{section}                          % equation numbering follows section
-\renewcommand{\theequation}{\arabic{section}.\arabic{equation}}% display as 1.1
+\numberwithin{equation}{chapter}                          % equation numbering follows chapter
+\renewcommand{\theequation}{\arabic{chapter}.\arabic{equation}}% display as 2.1
 
 % ================================= Footer ================================
 \pagestyle{fancy}                                         % enable fancyhdr
@@ -60,10 +62,10 @@
     \end{center}
     \vspace{-1.2\baselineskip}
 }
-% Custom "Pages" column header, right-aligned
+% Custom "Page" column header, right-aligned (per NTU guideline Appendix 6)
 \renewcommand{\cftaftertoctitle}{%
     \vspace{-1.5\baselineskip} % reduce space after Table of Contents
-    \hfill\underline{Pages} % right-aligned
+    \hfill\underline{Page} % right-aligned
     \par\vskip-2\baselineskip % adjust spacing
 }
 % TOC formatting
@@ -80,8 +82,8 @@
 \renewcommand{\cftsecaftersnumb}{}                      % section number suffix
 \setlength{\cftsecindent}{0em}                          % section indent
 \setlength{\cftsecnumwidth}{2em}                        % section number width
-\renewcommand{\cftsecdotsep}{\cftnodots}                % remove dot leaders
-\renewcommand{\cftsecpagefont}{\color{white}}        % hide page numbers
+\renewcommand{\cftsecdotsep}{\cftnodots}                % no dot leaders for sections (per NTU template)
+\renewcommand{\cftsecpagefont}{\color{white}}           % hide section page numbers (per NTU template)
 % Spacing
 \setlength{\cftbeforechapskip}{0.5em}                   % space before chapter
 \setlength{\cftbeforesecskip}{0.5em}                    % space before section

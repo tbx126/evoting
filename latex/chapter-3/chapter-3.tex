@@ -2,7 +2,7 @@
 \begingroup
 \justifying
 \setlength{\parindent}{0pt}
-\setstretch{2}
+\setstretch{1.5}
 \setlength{\parskip}{0.5\baselineskip}
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
@@ -34,12 +34,12 @@ The following are not fully solved in the current prototype: coercion resistance
 
 Election lifecycle states are:
 \begin{equation}
-S = \{Created, Active, Ended, Tallied\}
+S = \{\texttt{Created},\ \texttt{Active},\ \texttt{Ended},\ \texttt{Tallied}\}
 \end{equation}
 
 Allowed transitions are:
 \begin{equation}
-Created \rightarrow Active \rightarrow Ended \rightarrow Tallied
+\texttt{Created} \rightarrow \texttt{Active} \rightarrow \texttt{Ended} \rightarrow \texttt{Tallied}
 \end{equation}
 
 This deterministic state machine ensures that vote submission only occurs in the active phase and tally finalization only occurs after the election is ended.
@@ -106,23 +106,26 @@ $\mathbf{m}=(m_0,\dots,m_{N-1})$ where $m_v=1$ and all other entries are $0$.
 
 For each position $i$, ElGamal ciphertext is generated on BabyJubJub:
 \begin{equation}
-C1_i = r_i G, \quad C2_i = m_i G + r_i PK
+C1_i = r_i \cdot G, \quad C2_i = m_i \cdot G + r_i \cdot \mathit{PK}
 \end{equation}
-where $r_i$ is random nonce, $G$ is generator, and $PK$ is administrator public key.
+where $r_i$ is random nonce, $G$ is generator, and $\mathit{PK}$ is administrator public key.
 
 \section{Commitment and Ciphertext Binding}
 
 For random salt $s$, commitment is defined as:
 \begin{equation}
-Com = Poseidon(v, s)
+\mathit{Com} = \mathsf{Poseidon}(v,\, s)
 \end{equation}
 
 Ciphertext binding hash is defined over all ciphertext coordinates:
 \begin{equation}
-H_{ct} = Poseidon(c1X_0,c1Y_0,c2X_0,c2Y_0,\dots,c1X_{N-1},c1Y_{N-1},c2X_{N-1},c2Y_{N-1})
+\begin{split}
+H_{ct} = \mathsf{Poseidon}(&\mathit{c1X}_0,\,\mathit{c1Y}_0,\,\mathit{c2X}_0,\,\mathit{c2Y}_0,\,\dots,\\
+                  &\mathit{c1X}_{N-1},\,\mathit{c1Y}_{N-1},\,\mathit{c2X}_{N-1},\,\mathit{c2Y}_{N-1})
+\end{split}
 \end{equation}
 
-The vote proof uses $(Com, H_{ct}, pk_X, pk_Y)$ as public signals and proves consistency between commitment, candidate index, and encrypted one-hot structure.
+The vote proof uses $(\mathit{Com}, H_{ct}, pk_X, pk_Y)$ as public signals and proves consistency between commitment, candidate index, and encrypted one-hot structure.
 
 \section{Vote Proof Constraints}
 
@@ -150,7 +153,7 @@ R_j = \bar{C2}_j - sk \cdot \bar{C1}_j
 
 The tally circuit proves:
 \begin{itemize}
-    \item key ownership consistency: $PK = sk \cdot G$;
+    \item key ownership consistency: $\mathit{PK} = sk \cdot G$;
     \item decryption correctness per candidate;
     \item sum consistency of all result points with total vote count.
 \end{itemize}
@@ -159,12 +162,12 @@ The tally circuit proves:
 
 The audit set uses commitment values as leaves directly:
 \begin{equation}
-leaf_i = commitment_i
+\mathit{leaf}_i = \mathit{commitment}_i
 \end{equation}
 
 Internal nodes are built using Keccak over ordered child pair:
 \begin{equation}
-node = keccak256(left \parallel right)
+\mathit{node} = \mathsf{keccak256}(\mathit{left} \parallel \mathit{right})
 \end{equation}
 
 If a layer has odd cardinality, the last node is duplicated. Commitments are sorted by
@@ -216,7 +219,7 @@ While the current implementation is suitable for small-to-medium election sizes 
 
 \section{Chapter Summary}
 
-This chapter formalized the protocol model, specified threat assumptions, and defined the cryptographic workflow from ballot encoding to anonymous audit verification. It also established deterministic Merkle construction rules and complexity bounds that guide the implementation choices described in Chapter 4.
+This chapter formalized the protocol model, specified threat assumptions, and defined the cryptographic workflow from ballot encoding to anonymous audit verification. It also established deterministic Merkle construction rules and complexity bounds that guide the implementation choices described in Chapter 4. Where this chapter specified \emph{what} the protocol must do, Chapter 4 describes \emph{how} each component is realized in code, and the specific engineering decisions taken at each layer.
 
 \endgroup
 
