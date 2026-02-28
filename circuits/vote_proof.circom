@@ -7,15 +7,19 @@ include "../node_modules/circomlib/circuits/babyjub.circom";
 include "lib/elgamal.circom";
 
 /**
- * VoteProof circuit - Proves ZKP1 (ballot legality) + ZKP2 (consistency)
+ * VoteProof circuit - Proves ZKP1 (commitment correctness) + ZKP2 (one-hot validity)
+ *
+ * Naming convention (matches dissertation and CLAUDE.md):
+ *   ZKP1 = commitment correctness: commitment = Poseidon(candidateId, salt)
+ *   ZKP2 = one-hot validity:       encrypted ballots form a valid one-hot vector
  *
  * This circuit proves that:
- *   1. commitment = Poseidon(candidateId, salt)          [ZKP2: consistency]
- *   2. 0 <= candidateId < numCandidates                  [ZKP1: legality]
+ *   1. commitment = Poseidon(candidateId, salt)          [ZKP1: commitment correctness]
+ *   2. 0 <= candidateId < numCandidates                  [ZKP2: range check]
  *   3. The encrypted vote is a valid one-hot vector:
- *      - ciphertext[candidateId] encrypts 1              [ZKP1+ZKP2]
- *      - ciphertext[j != candidateId] encrypts 0         [ZKP1]
- *   4. ciphertextHash = Poseidon(all ciphertext components) [binding]
+ *      - ciphertext[candidateId] encrypts 1              [ZKP2: one-hot validity]
+ *      - ciphertext[j != candidateId] encrypts 0         [ZKP2: one-hot validity]
+ *   4. ciphertextHash = Poseidon(all ciphertext components) [ZKP2: ciphertext binding]
  *
  * Template parameter:
  *   numCandidates - number of candidates (fixed at compile time)

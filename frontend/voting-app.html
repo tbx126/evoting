@@ -496,6 +496,32 @@
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { transition: none !important; animation: none !important; }
         }
+        /* --- Verify Section --- */
+        .verify-section-label {
+            font-size: 11px;
+            color: var(--color-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 6px;
+            margin-top: 12px;
+        }
+        .audit-status {
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            padding: 9px 12px;
+            border-radius: 6px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            color: var(--color-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .audit-status.loaded {
+            color: var(--color-cta);
+            border-color: rgba(34,197,94,0.3);
+            background: rgba(34,197,94,0.05);
+        }
         /* --- Focus States --- */
         .btn:focus-visible, .cand-card:focus-visible, .nav-link:focus-visible, .nav-connect-btn:focus-visible {
             outline: 2px solid var(--color-cta);
@@ -562,6 +588,7 @@
             <div class="alert alert-success" id="alreadyVotedAlert" style="display:none;">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 你已经投过票了！感谢你的参与。
+                <a href="#verifySection" onclick="document.getElementById('verifySection').scrollIntoView({behavior:'smooth'});return false;" style="color:var(--color-cta);margin-left:8px;font-weight:600;">→ 验证我的投票</a>
             </div>
         </div>
         <!-- Voting Section -->
@@ -626,21 +653,30 @@
         <div class="section" id="verifySection">
             <div class="section-title">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/></svg>
-                Verify My Vote (Anonymous)
+                匿名投票验证
             </div>
-            <div class="verify-help">
-                Use your local receipt (`candidateId + salt + commitment`) and an `audit_bundle.json` exported by the admin to verify inclusion without address lookup.
+            <p class="verify-help">使用本地投票凭证（candidateId、salt、commitment）及管理员导出的审计包，在不暴露地址的情况下验证你的选票已被记录。</p>
+            <div class="verify-section-label">审计包</div>
+            <div class="audit-status" id="auditBundleStatus">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                <span>尚未加载审计包</span>
             </div>
             <div class="verify-actions">
-                <button class="btn btn-cta" type="button" onclick="loadLocalReceipt()">Load Local Receipt</button>
-                <input id="auditBundleFile" type="file" accept=".json,application/json" />
-                <button class="btn btn-cta" type="button" onclick="verifyMyVote()">Run Verification</button>
+                <button class="btn btn-cta" type="button" onclick="loadLocalReceipt()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    加载本地凭证
+                </button>
+                <label class="btn btn-cta" style="cursor:pointer;" for="auditBundleFile">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    导入审计包
+                </label>
+                <input id="auditBundleFile" type="file" accept=".json,application/json" style="display:none;"/>
+                <button class="btn btn-cta" type="button" onclick="verifyMyVote()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/></svg>
+                    运行验证
+                </button>
             </div>
-            <label for="receiptInput" class="verify-help">Receipt JSON</label>
-            <textarea id="receiptInput" class="verify-textarea" placeholder='{"candidateId":0,"salt":"...","commitment":"..."}'></textarea>
-            <label for="auditBundleInput" class="verify-help">Audit Bundle JSON</label>
-            <textarea id="auditBundleInput" class="verify-textarea" placeholder='{"root":"0x...","entries":[...]}'></textarea>
-            <div id="verifyResult" class="verify-result">No verification has been run yet.</div>
+            <div id="verifyResult" class="verify-result" style="margin-top:10px;">尚未执行验证。</div>
         </div>
     </main>
     <!-- Log Sidebar -->
@@ -680,6 +716,7 @@
         let elgamal = null;
         let adminPK = null;
         let loadedAuditBundle = null;
+        let loadedReceipt = null;
         const STATUS_NAMES = ["已创建", "进行中", "已结束", "已计票"];
         const AVATAR_COLORS = [
             'linear-gradient(135deg,#22C55E,#16A34A)',
@@ -692,13 +729,25 @@
             'linear-gradient(135deg,#8B5CF6,#6D28D9)',
         ];
 
+        function escapeHtml(str) {
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        }
         function addLog(message, type = 'info') {
             const time = new Date().toLocaleTimeString();
-            const html = `<span class="log-time">[${time}]</span> <span class="log-${type}">${message}</span>`;
+            const html = `<span class="log-time">[${time}]</span> <span class="log-${type}">${escapeHtml(message)}</span>`;
             const body = document.getElementById('logBody');
             const entry = document.createElement('div');
             entry.className = 'log-entry';
             entry.innerHTML = html;
+            body.appendChild(entry);
+            body.scrollTop = body.scrollHeight;
+        }
+        function addLogHtml(htmlContent, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const body = document.getElementById('logBody');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${htmlContent}</span>`;
             body.appendChild(entry);
             body.scrollTop = body.scrollHeight;
         }
@@ -726,17 +775,22 @@
 
         function loadLocalReceipt() {
             if (!currentAccount) {
-                addLog('Connect wallet first to load local receipt', 'warning');
+                addLog('请先连接钱包', 'warning');
                 return;
             }
             const data = localStorage.getItem(receiptKey());
             if (!data) {
-                addLog('No local receipt found for this election', 'warning');
-                setVerifyResult('No local receipt found for this election.', 'error');
+                addLog('未找到本选举的本地凭证', 'warning');
+                setVerifyResult('未找到本选举的本地凭证，请先投票或通过管理员恢复。', 'error');
                 return;
             }
-            document.getElementById('receiptInput').value = data;
-            addLog('Local receipt loaded', 'success');
+            try {
+                loadedReceipt = JSON.parse(data);
+                addLog('已加载本地投票凭证', 'success');
+                setVerifyResult('凭证已加载，点击「运行验证」执行验证。');
+            } catch (e) {
+                addLog('本地凭证格式错误', 'error');
+            }
         }
 
         function loadAuditBundleFromText(raw) {
@@ -745,7 +799,6 @@
                 throw new Error('Invalid audit bundle format');
             }
             loadedAuditBundle = parsed;
-            document.getElementById('auditBundleInput').value = JSON.stringify(parsed, null, 2);
             return parsed;
         }
 
@@ -754,28 +807,28 @@
             if (!file) return;
             try {
                 const raw = await file.text();
-                loadAuditBundleFromText(raw);
-                addLog(`Audit bundle loaded from file: ${file.name}`, 'success');
+                const parsed = loadAuditBundleFromText(raw);
+                const statusEl = document.getElementById('auditBundleStatus');
+                statusEl.className = 'audit-status loaded';
+                statusEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>' + escapeHtml(file.name) + ' · ' + parsed.entries.length + ' 条记录</span>';
+                addLog(`审计包已加载: ${file.name} (${parsed.entries.length} 条记录)`, 'success');
             } catch (error) {
-                addLog(`Failed to read audit bundle: ${error.message}`, 'error');
-                setVerifyResult(`Invalid audit bundle file: ${error.message}`, 'error');
+                addLog(`读取审计包失败: ${error.message}`, 'error');
+                setVerifyResult(`审计包格式无效: ${error.message}`, 'error');
             }
         }
 
         function verifyMyVote() {
             try {
-                if (!elgamal) throw new Error('ZKP library not initialized');
+                if (!elgamal) throw new Error('ZKP 库尚未初始化');
+                if (!loadedReceipt) throw new Error('请先点击「加载本地凭证」');
+                if (!loadedAuditBundle) throw new Error('请先导入审计包');
 
-                const receiptRaw = document.getElementById('receiptInput').value.trim();
-                if (!receiptRaw) throw new Error('Receipt JSON is required');
-                const receipt = JSON.parse(receiptRaw);
-
-                const auditRaw = document.getElementById('auditBundleInput').value.trim();
-                const bundle = auditRaw ? loadAuditBundleFromText(auditRaw) : loadedAuditBundle;
-                if (!bundle) throw new Error('Audit bundle JSON is required');
+                const receipt = loadedReceipt;
+                const bundle = loadedAuditBundle;
 
                 if (receipt.electionId && bundle.electionId && receipt.electionId !== bundle.electionId) {
-                    throw new Error('Election ID mismatch between receipt and audit bundle');
+                    throw new Error('凭证与审计包的选举 ID 不匹配');
                 }
 
                 const computedCommitment = elgamal.computeCommitment(
@@ -785,30 +838,30 @@
                 const computedHex = toCommitmentHex(computedCommitment);
                 const receiptHex = toCommitmentHex(receipt.commitment);
                 if (computedHex !== receiptHex) {
-                    throw new Error('Receipt commitment does not match candidateId+salt');
+                    throw new Error('凭证中的 commitment 与 candidateId+salt 不匹配');
                 }
 
-                const candidates = AuditLib.findEntriesByCommitment(bundle, receiptHex);
-                if (candidates.length === 0) {
-                    throw new Error('Commitment not found in audit bundle');
+                const matches = AuditLib.findEntriesByCommitment(bundle, receiptHex);
+                if (matches.length === 0) {
+                    throw new Error('在审计包中未找到该 commitment');
                 }
 
-                let entry = candidates[0];
+                let entry = matches[0];
                 if (receipt.txHash) {
-                    const byTx = candidates.find(
+                    const byTx = matches.find(
                         (item) => item.txHash && item.txHash.toLowerCase() === String(receipt.txHash).toLowerCase()
                     );
                     if (byTx) entry = byTx;
                 }
 
                 const included = AuditLib.verifyProof(entry.commitment, entry.proof, bundle.root, entry.index);
-                if (!included) throw new Error('Merkle proof verification failed');
+                if (!included) throw new Error('Merkle 证明验证失败');
 
-                const summary = `Verified: commitment is included (index=${entry.index}, root=${bundle.root.slice(0, 18)}...)`;
+                const summary = `验证成功：选票已记录 (index=${entry.index}, root=${bundle.root.slice(0, 18)}...)`;
                 setVerifyResult(summary, 'success');
                 addLog(summary, 'success');
             } catch (error) {
-                const message = `Verification failed: ${error.message}`;
+                const message = `验证失败: ${error.message}`;
                 setVerifyResult(message, 'error');
                 addLog(message, 'error');
             }
@@ -887,8 +940,12 @@
 
                 const cachedReceipt = localStorage.getItem(receiptKey());
                 if (cachedReceipt) {
-                    document.getElementById('receiptInput').value = cachedReceipt;
-                    addLog('Loaded local receipt for this election', 'info');
+                    try {
+                        loadedReceipt = JSON.parse(cachedReceipt);
+                        addLog('已检测到本选举的本地凭证，可前往验证区验证', 'info');
+                    } catch (e) {
+                        addLog('本地凭证格式错误', 'warning');
+                    }
                 }
 
                 await loadElectionInfo();
@@ -927,11 +984,7 @@
                 const nameDiv = document.createElement('div');
                 nameDiv.className = 'cand-name';
                 nameDiv.textContent = c.name;
-                const votesDiv = document.createElement('div');
-                votesDiv.className = 'cand-votes';
-                votesDiv.textContent = `${c.votes} 票`;
                 info.appendChild(nameDiv);
-                info.appendChild(votesDiv);
 
                 card.appendChild(avatar);
                 card.appendChild(info);
@@ -965,7 +1018,7 @@
                 const hasVoted = await votingContract.hasVoted(currentAccount);
                 addLog(`选民状态: ${isRegistered ? '已注册' : '未注册'}, ${hasVoted ? '已投票' : '未投票'}`, 'info');
 
-                document.getElementById('notRegisteredAlert').style.display = isRegistered ? 'none' : 'block';
+                document.getElementById('notRegisteredAlert').style.display = (!isRegistered && status === 1) ? 'block' : 'none';
                 document.getElementById('alreadyVotedAlert').style.display = hasVoted ? 'block' : 'none';
 
                 candidates = [];
@@ -1008,16 +1061,16 @@
             const sorted = [...candidates].sort((a, b) => b.votes - a.votes);
             const winnerVotes = sorted[0]?.votes || 0;
             const container = document.getElementById('resultsContainer');
-            container.innerHTML = sorted.map((c, i) => {
+            container.innerHTML = '';
+            sorted.forEach((c, i) => {
                 const pct = Math.round((c.votes / maxVotes) * 100);
                 const isWinner = c.votes === winnerVotes && winnerVotes > 0;
-                return `<div class="result-item${isWinner ? ' winner' : ''}">
-                    <div class="result-rank">#${i + 1}</div>
-                    <div class="result-name">${c.name}</div>
-                    <div class="result-bar-wrap"><div class="result-bar" style="width:${pct}%"></div></div>
-                    <div class="result-count">${c.votes} 票</div>
-                </div>`;
-            }).join('');
+                const item = document.createElement('div');
+                item.className = 'result-item' + (isWinner ? ' winner' : '');
+                item.innerHTML = `<div class="result-rank">#${i + 1}</div><div class="result-name"></div><div class="result-bar-wrap"><div class="result-bar" style="width:${pct}%"></div></div><div class="result-count">${c.votes} 票</div>`;
+                item.querySelector('.result-name').textContent = c.name;
+                container.appendChild(item);
+            });
         }
 
         function selectCandidate(id) {
@@ -1031,6 +1084,10 @@
 
         async function submitVote() {
             if (selectedCandidate === null || !elgamal) return;
+            if (!adminPK) {
+                addLog('ElGamal 公钥未加载，请重新连接钱包', 'error');
+                return;
+            }
             try {
                 const voteBtn = document.getElementById('voteBtn');
                 voteBtn.disabled = true;
@@ -1082,7 +1139,9 @@
 
                 addLog('投票成功! (含零知识证明)', 'success');
                 if (CONTRACT_CONFIG.NETWORK.explorerUrl) {
-                    addLog(`<a style="color:var(--color-info);text-decoration:none;" href="${CONTRACT_CONFIG.NETWORK.explorerUrl}/tx/${tx.hash}" target="_blank">查看交易</a>`, 'success');
+                    addLogHtml(`<a style="color:var(--color-info);text-decoration:none;" href="${CONTRACT_CONFIG.NETWORK.explorerUrl}/tx/${escapeHtml(tx.hash)}" target="_blank">查看交易 ${escapeHtml(tx.hash.slice(0,10))}...</a>`, 'success');
+                } else {
+                    addLog(`交易哈希: ${tx.hash.slice(0,10)}...`, 'success');
                 }
 
                 const voteReceipt = {
@@ -1095,16 +1154,17 @@
                     timestamp: Date.now()
                 };
                 localStorage.setItem(receiptKey(), JSON.stringify(voteReceipt));
-                document.getElementById('receiptInput').value = JSON.stringify(voteReceipt, null, 2);
-                addLog('投票凭证已保存到本地 (可用于事后验证)', 'info');
+                loadedReceipt = voteReceipt;
+                addLog('投票凭证已保存到本地 (可前往验证区验证)', 'info');
 
                 await loadElectionInfo();
                 voteBtn.innerHTML = '已投票';
             } catch (error) {
                 addLog(`投票失败: ${error.message}`, 'error');
                 console.error('Vote error:', error);
-                document.getElementById('voteBtn').disabled = false;
-                document.getElementById('voteBtn').innerHTML = '提交投票 (ZKP)';
+                const voteBtn2 = document.getElementById('voteBtn');
+                voteBtn2.disabled = false;
+                voteBtn2.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> 提交投票 (ZKP)';
             }
         }
         window.addEventListener('load', async () => {
@@ -1128,10 +1188,12 @@
             if (cachedBundle) {
                 try {
                     loadedAuditBundle = JSON.parse(cachedBundle);
-                    document.getElementById('auditBundleInput').value = JSON.stringify(loadedAuditBundle, null, 2);
-                    addLog('Loaded cached audit bundle from local storage', 'info');
+                    const statusEl = document.getElementById('auditBundleStatus');
+                    statusEl.className = 'audit-status loaded';
+                    statusEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>已从缓存加载 · ' + loadedAuditBundle.entries.length + ' 条记录</span>';
+                    addLog('已从本地缓存加载审计包', 'info');
                 } catch (error) {
-                    addLog(`Failed to parse cached audit bundle: ${error.message}`, 'warning');
+                    addLog('解析缓存审计包失败: ' + error.message, 'warning');
                 }
             }
 
