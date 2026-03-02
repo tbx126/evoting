@@ -33,8 +33,10 @@
 
 % ================================= Equations ================================
 \AtBeginEnvironment{equation}{\setstretch{1}}             % single spacing for equations
+\AtBeginEnvironment{equation*}{\setstretch{1}}            % single spacing for unnumbered equations
 \AtBeginEnvironment{align}{\setstretch{1}}                % single spacing for align equations
 \AtBeginEnvironment{align*}{\setstretch{1}}               % single spacing for unnumbered align
+\AtBeginEnvironment{gather*}{\setstretch{1}}              % single spacing for unnumbered gather
 \AtEndEnvironment{equation}{}                             % restore after equation
 \numberwithin{equation}{chapter}                          % equation numbering follows chapter
 \renewcommand{\theequation}{\thechapter.\arabic{equation}}% display as 2.1 / A.1

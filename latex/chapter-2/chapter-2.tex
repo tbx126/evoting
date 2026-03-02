@@ -53,17 +53,21 @@ In this project, two instances of this pattern apply:
     \item \textbf{Vote proof}: the public statement and witness are
     \begin{gather*}
     x = (\mathit{commitment},\; H_{ct},\; pk_X,\; pk_Y) \\
-    w = (\mathit{candidateId},\; \mathit{salt},\; r_0, \dots, r_{N-1})
+    \begin{split}
+    w = (&\mathit{candidateId},\; \mathit{salt},\; r_0, \dots, r_{N-1},\\
+         &\mathit{c1X}_0,\; \mathit{c1Y}_0,\; \mathit{c2X}_0,\; \mathit{c2Y}_0,\; \dots,\; \mathit{c1X}_{N-1},\; \mathit{c1Y}_{N-1},\; \mathit{c2X}_{N-1},\; \mathit{c2Y}_{N-1})
+    \end{split}
     \end{gather*}
-    The relation $\mathcal{R}$ requires that the commitment is correctly formed from the candidate index and salt, and that the ciphertexts encode the corresponding one-hot vector under the public key.
+    The relation $\mathcal{R}$ requires that: (i) $\mathit{commitment} = \mathsf{Poseidon}(\mathit{candidateId}, \mathit{salt})$, (ii) $0 \le \mathit{candidateId} < N$, (iii) each ciphertext tuple $(\mathit{c1X}_j,\mathit{c1Y}_j,\mathit{c2X}_j,\mathit{c2Y}_j)$ is a valid ElGamal encryption of one-hot bit $m_j$ where $m_j=1$ iff $j=\mathit{candidateId}$, and (iv) $H_{ct}$ matches the Poseidon hash of all ciphertext coordinates.
     \item \textbf{Tally proof}: $w = sk$, with public statement
     \begin{equation*}
         \begin{split}
-        x = (&pk_X,\; pk_Y,\; \bar{C1}^{X}_0,\; \bar{C1}^{Y}_0,\; \dots,\; \bar{C2}^{X}_{N-1},\; \bar{C2}^{Y}_{N-1},\\
-             &R^{X}_0,\; R^{Y}_0,\; \dots,\; R^{X}_{N-1},\; R^{Y}_{N-1},\; V)
+        x = (&pk_X,\; pk_Y,\; \bar{C1}^{X}_0,\; \bar{C1}^{Y}_0,\; \dots,\; \bar{C1}^{X}_{N-1},\; \bar{C1}^{Y}_{N-1},\\
+             &\bar{C2}^{X}_0,\; \bar{C2}^{Y}_0,\; \dots,\; \bar{C2}^{X}_{N-1},\; \bar{C2}^{Y}_{N-1},\\
+             &R^{X}_0,\; R^{Y}_0,\; \dots,\; R^{X}_{N-1},\; R^{Y}_{N-1},\; \mathit{totalVotes})
         \end{split}
     \end{equation*}
-    where $R^{X}_j$, $R^{Y}_j$ are the coordinates of the result point $\mathbf{results}[j] \cdot G$ for candidate $j$.
+    where $R^{X}_j$, $R^{Y}_j$ are the coordinates of the result point $\mathbf{results}[j] \cdot G$ for candidate $j$, and $\mathit{totalVotes}$ is the expected sum of all candidate totals.
 \end{itemize}
 
 \subsection{Formal Security Properties}
@@ -97,15 +101,22 @@ In circom, the programmer writes constraints in a domain-specific language. The 
 
 Groth16 operates on a polynomial encoding of the R1CS called a \emph{Quadratic Arithmetic Program} (QAP) \cite{gennaro2013}. For each constraint index $i$ and witness index $j$, define polynomials $u_j, v_j, w_j \in \mathbb{F}_p[X]$ by Lagrange interpolation through the point values $u_j(i) = a_{i,j}$, $v_j(i) = b_{i,j}$, $w_j(i) = c_{i,j}$.
 
-The witness $\mathbf{s}$ satisfies all $m$ R1CS constraints if and only if the vanishing polynomial $T(X) = \prod_{i=1}^{m}(X - i)$ divides the polynomial:
+Define
+\begin{equation*}
+A(X)=\sum_j s_j\,u_j(X), \qquad B(X)=\sum_j s_j\,v_j(X), \qquad C(X)=\sum_j s_j\,w_j(X).
+\end{equation*}
+At each constraint point $X=i$, interpolation gives $A(i)=\langle \mathbf{a}_i,\mathbf{s}\rangle$, $B(i)=\langle \mathbf{b}_i,\mathbf{s}\rangle$, and $C(i)=\langle \mathbf{c}_i,\mathbf{s}\rangle$. Therefore the R1CS equations imply
+\begin{equation*}
+A(i)\cdot B(i)-C(i)=0, \qquad i=1,\dots,m.
+\end{equation*}
+So the polynomial
 \begin{equation}
 \begin{split}
     P(X) \;=\; &\Bigl(\sum_j s_j\, u_j(X)\Bigr) \cdot \Bigl(\sum_j s_j\, v_j(X)\Bigr) \\
                &-\; \sum_j s_j\, w_j(X)
 \end{split}
 \end{equation}
-
-Equivalently, there exists a quotient polynomial $H(X)$ such that:
+satisfies $P(i)=0$ for all $i=1,\dots,m$. Since $T(X)=\prod_{i=1}^{m}(X-i)$ has exactly these roots, $T(X)$ divides $P(X)$, and equivalently there exists a quotient polynomial $H(X)$ such that:
 \begin{equation}
     A(X) \cdot B(X) \;-\; C(X) \;=\; H(X) \cdot T(X)
 \end{equation}
