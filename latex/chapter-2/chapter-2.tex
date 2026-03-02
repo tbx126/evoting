@@ -15,7 +15,7 @@ In practice, these requirements split across cryptographic and operational contr
 
 \section{Centralized E-Voting Systems}
 
-Conventional centralized architectures handle the election lifecycle through web services and database transactions. Mature tooling and low operational complexity give these systems a practical edge; incident response also stays inside one trust boundary. The limitations are harder to overlook:
+Conventional centralized architectures handle the election lifecycle through web services and database transactions. Mature tooling and low operational complexity give these systems a practical edge; incident response, however, remains inside the same trust boundary. The limitations are harder to overlook:
 \begin{itemize}
     \item privileged insiders can alter records or logs if access controls slip;
     \item replaying state transitions independently requires a full data export, which is not always available;
@@ -26,38 +26,36 @@ These gaps motivate replacing trust-in-operator with trust-in-protocol.
 
 \section{Blockchain-Based Voting Approaches}
 
-Blockchain infrastructures maintain immutable append-only logs with deterministic execution rules \cite{nakamoto2008,wood2014}. Election state transitions and event traces are transparently recorded. Smart contracts enforce lifecycle invariants directly---there is no hidden backend to trust.
+Blockchain infrastructures maintain immutable append-only logs with deterministic execution rules \cite{nakamoto2008,wood2014}. Election state transitions and event traces are transparently recorded. Smart contracts enforce lifecycle invariants directly, reducing reliance on hidden backend logic.
 
 Transparency cuts both ways, though. If vote semantics appear in plaintext, confidentiality is permanently lost. A privacy-preserving blockchain voting system must therefore pair ledger transparency for control flow with cryptographic concealment for ballot content.
 
 \section{Homomorphic Encryption for Private Tally}
 
-ElGamal encryption on discrete-log groups supports additive homomorphism over encoded messages \cite{elgamal1985}. Each ballot is encoded as a one-hot vector; component-wise aggregation of ciphertexts gives encrypted candidate totals. Decrypting only the aggregates avoids exposing individual ballots.
+ElGamal encryption on elliptic-curve discrete-log groups supports additive homomorphism over encoded messages \cite{elgamal1985,hankerson2004ecc}. Each ballot is encoded as a one-hot vector; component-wise aggregation of ciphertexts gives encrypted candidate totals. Decrypting only the aggregates avoids exposing individual ballots.
 
-Two practical advantages follow. Tallying cost scales linearly with vote count using simple point operations. Privacy holds as long as secret-key exposure and plaintext side channels stay controlled---a weaker guarantee than threshold decryption, but achievable without ceremony infrastructure.
+Two practical advantages follow. Ciphertext aggregation scales linearly with vote count using simple point additions; recovering final integer totals from decrypted points is a separate off-chain discrete-log step. Privacy holds as long as secret-key exposure and plaintext side channels stay controlled---a weaker guarantee than threshold decryption, but achievable without ceremony infrastructure.
 
 \section{Zero-Knowledge Proofs in Voting}
 
 A zero-knowledge proof (ZKP) is a cryptographic protocol in which a prover convinces a verifier that a statement is true without disclosing any information beyond the statement's truth itself \cite{goldwasser1989}. In e-voting, this capability is foundational: a voter must prove that their ballot is correctly formed---encoding exactly one valid candidate choice---without revealing which candidate was selected; an administrator must prove that a tally is correctly decrypted without revealing the secret key. ZKPs therefore allow public verifiability and ballot privacy to coexist.
 
-This dissertation uses Groth16, a zk-SNARK (Succinct Non-interactive ARgument of Knowledge), because its on-chain verification cost is fixed regardless of circuit complexity and proof size is constant at three elliptic-curve points \cite{groth2016}. Circom and snarkjs provide the implementation pipeline from circuit specification to deployable Solidity verifier contracts \cite{circomdocs,snarkjs}.
+This dissertation uses Groth16, a zk-SNARK (Succinct Non-interactive ARgument of Knowledge), because its pairing-check cost is fixed with respect to circuit-constraint count and proof size is constant at three elliptic-curve points \cite{groth2016}. Total verifier gas still includes a smaller public-input term, but does not scale with full circuit size. Circom and snarkjs provide the implementation pipeline from circuit specification to deployable Solidity verifier contracts \cite{circomdocs,snarkjs}.
 
 \subsection{The Problem ZKPs Address}
 
-Classical proof systems require the witness (secret data) to be transmitted to the verifier. In e-voting this is unacceptable: revealing a candidate index to prove ballot validity destroys ballot secrecy; revealing a decryption key to prove tally correctness collapses key governance.
+Many non-zero-knowledge proof workflows require witness (secret data) exposure to the verifier. In e-voting this is unacceptable: revealing a candidate index to prove ballot validity destroys ballot secrecy; revealing a decryption key to prove tally correctness collapses key governance.
 
 ZKPs separate the \emph{claim} from the \emph{evidence}. Let $x$ be a public statement and $w$ be a private witness. Define a relation $\mathcal{R}$ such that $(x, w) \in \mathcal{R}$ means ``$w$ is a valid witness for $x$''. A ZKP system allows a prover who knows $w$ to produce a short artifact $\pi$ that convinces any verifier that $(x, w) \in \mathcal{R}$, without $\pi$ leaking any information about $w$.
 
 In this project, two instances of this pattern apply:
 \begin{itemize}
     \item \textbf{Vote proof}: the public statement and witness are
-    \begin{gather*}
-    x = (\mathit{commitment},\; H_{ct},\; pk_X,\; pk_Y) \\
-    \begin{split}
-    w = (&\mathit{candidateId},\; \mathit{salt},\; r_0, \dots, r_{N-1},\\
-         &\mathit{c1X}_0,\; \mathit{c1Y}_0,\; \mathit{c2X}_0,\; \mathit{c2Y}_0,\; \dots,\; \mathit{c1X}_{N-1},\; \mathit{c1Y}_{N-1},\; \mathit{c2X}_{N-1},\; \mathit{c2Y}_{N-1})
-    \end{split}
-    \end{gather*}
+    \begin{align*}
+    x &= (\mathit{commitment},\; H_{ct},\; pk_X,\; pk_Y) \\
+    w &= (\mathit{candidateId},\; \mathit{salt},\; r_0, \dots, r_{N-1},\\
+       &\quad \mathit{c1X}_0,\; \mathit{c1Y}_0,\; \mathit{c2X}_0,\; \mathit{c2Y}_0,\; \dots,\; \mathit{c1X}_{N-1},\; \mathit{c1Y}_{N-1},\; \mathit{c2X}_{N-1},\; \mathit{c2Y}_{N-1})
+    \end{align*}
     The relation $\mathcal{R}$ requires that: (i) $\mathit{commitment} = \mathsf{Poseidon}(\mathit{candidateId}, \mathit{salt})$, (ii) $0 \le \mathit{candidateId} < N$, (iii) each ciphertext tuple $(\mathit{c1X}_j,\mathit{c1Y}_j,\mathit{c2X}_j,\mathit{c2Y}_j)$ is a valid ElGamal encryption of one-hot bit $m_j$ where $m_j=1$ iff $j=\mathit{candidateId}$, and (iv) $H_{ct}$ matches the Poseidon hash of all ciphertext coordinates.
     \item \textbf{Tally proof}: $w = sk$, with public statement
     \begin{equation*}
@@ -67,7 +65,7 @@ In this project, two instances of this pattern apply:
              &R^{X}_0,\; R^{Y}_0,\; \dots,\; R^{X}_{N-1},\; R^{Y}_{N-1},\; \mathit{totalVotes})
         \end{split}
     \end{equation*}
-    where $R^{X}_j$, $R^{Y}_j$ are the coordinates of the result point $\mathbf{results}[j] \cdot G$ for candidate $j$, and $\mathit{totalVotes}$ is the expected sum of all candidate totals.
+    where $R^{X}_j$, $R^{Y}_j$ are the coordinates of the result point $\mathbf{results}[j] \cdot G$ for candidate $j$, and $\mathit{totalVotes}$ is the expected sum of all candidate totals (corresponding to $V$ in Chapter 1).
 \end{itemize}
 
 \subsection{Formal Security Properties}
@@ -79,7 +77,7 @@ A ZKP system must satisfy three properties \cite{goldwasser1989}:
     \item \textbf{Zero-Knowledge}: A simulator can produce proofs indistinguishable from real proofs without knowing $w$. This formalizes that $\pi$ reveals nothing about $w$ beyond the existence of a valid witness.
 \end{enumerate}
 
-In a zk-SNARK, soundness is computational (relying on cryptographic hardness assumptions), and the non-interactive property replaces the verifier's challenge with a structured reference string derived from a trusted setup.
+In a zk-SNARK, soundness is computational (relying on cryptographic hardness assumptions), and non-interactivity is achieved through a structured reference string (SRS) produced in a trusted setup. The SRS provides the cryptographic parameters needed for proving and verification without any round-trip interaction.
 
 \subsection{Arithmetic Circuits and R1CS}
 
@@ -143,34 +141,34 @@ Given the full witness $\mathbf{s}$ and the proving key, the prover samples rand
     \pi_C &= \left[\frac{C_{\mathit{priv}}(\tau) + H(\tau)T(\tau)}{\delta}\right]_1 + s' \cdot \pi_A \\
           &\quad + r \cdot \bigl[\beta + B(\tau) + s'\delta\bigr]_1 - rs' \cdot [\delta]_1 \notag
 \end{align}
-where $[\cdot]_k$ denotes the elliptic-curve point $(\cdot) \cdot G_k$, and $C_{\mathit{priv}}$ denotes the private-witness portion of the $C$ polynomial. The blinding factors $r$ and $s'$ randomize the proof so that different proofs for the same statement are computationally indistinguishable, enforcing the zero-knowledge property.
+where $[\cdot]_k$ denotes the elliptic-curve point $(\cdot) \cdot G_k$, and $C_{\mathit{priv}}$ denotes the private-witness portion of the $C$ polynomial. The blinding factors $r$ and $s'$ enforce Groth16's perfect zero-knowledge property: a simulator can generate proofs with the same distribution as real proofs without knowing the witness.
 
 \paragraph{Verify.}
-The verifier checks a single bilinear pairing equation over the four group elements:
+The verifier checks one bilinear pairing equation combining proof elements with verification-key elements:
 \begin{equation}
     e(\pi_A,\; \pi_B) \;=\; e\bigl([\alpha]_1,\; [\beta]_2\bigr) \;\cdot\; e\!\left(\sum_{i=0}^{l} a_i \cdot \mathit{vk}_i,\; [\gamma]_2\right) \;\cdot\; e(\pi_C,\; [\delta]_2)
 \end{equation}
-where $l$ is the number of public inputs, $a_i$ are their values, and $\mathit{vk}_i = [(\beta u_i + \alpha v_i + w_i)(\tau)/\gamma]_1$ are precomputed elements of the verification key. This single equation encodes the correctness of $A(\tau) \cdot B(\tau) = C(\tau) + H(\tau) \cdot T(\tau)$ through the algebraic properties of the pairing, without recomputing the polynomials at $\tau$. A proof is accepted if and only if this equation holds.
+where $l$ is the number of explicit public inputs (excluding the constant term), $\mathit{vk}_i = [(\beta u_i + \alpha v_i + w_i)(\tau)/\gamma]_1$ are precomputed verification-key elements, $a_0 = 1$ is the constant term, and $a_1,\dots,a_l$ are the public-input values. This single equation encodes the correctness of $A(\tau) \cdot B(\tau) = C(\tau) + H(\tau) \cdot T(\tau)$ through the algebraic properties of the pairing, without recomputing the polynomials at $\tau$. A proof is accepted if and only if this equation holds.
 
 \subsection{On-Chain Verification Cost}
 
-The BN254 curve (also called BN128) is natively supported by the EVM as a precompiled contract at address \texttt{0x08} for pairing computations. Under EIP-1108, the gas cost model is:
+The BN254 curve (also called BN128) is natively supported by the EVM as a precompiled contract at address \texttt{0x08} for pairing computations. Under EIP-1108 \cite{eip1108}, the gas cost model is:
 \begin{equation}
     \mathit{gas}_{\mathit{pairing}} = 45{,}000 + 34{,}000 \times k
 \end{equation}
-where $k$ is the number of pairing pairs. The Groth16 verification equation requires $k = 4$ pairs (corresponding to the four terms in the equation above), yielding $45{,}000 + 34{,}000 \times 4 = 181{,}000$ gas for the pairing check alone. Crucially, this cost is \emph{independent of the number of circuit constraints}: a 14{,}590-constraint vote circuit and a 100{,}000-constraint circuit incur identical on-chain verification gas. This property makes Groth16 uniquely suited for complex ZKP computations that must be verified on-chain.
+where $k$ is the number of pairing pairs. The Groth16 verification equation requires $k = 4$ pairs (corresponding to the four terms in the equation above), yielding $45{,}000 + 34{,}000 \times 4 = 181{,}000$ gas for the pairing check alone. Crucially, this pairing-check cost is \emph{independent of the number of circuit constraints}: a 14{,}590-constraint vote circuit and a 100{,}000-constraint circuit incur identical pairing gas. The public-input linear combination adds a smaller overhead proportional to the number of public inputs, not circuit constraints. This property makes Groth16 uniquely suited for complex ZKP computations that must be verified on-chain.
 
 \subsection{Implementation Pipeline}
 
 The implementation follows a four-stage workflow:
 \begin{enumerate}
     \item \textbf{Circuit specification}: constraints are written in circom using library templates for BabyJubJub arithmetic, Poseidon hashing, and conditional logic. The compiler outputs \texttt{.r1cs} (constraint matrices $A, B, C$) and a WASM witness generator.
-    \item \textbf{Trusted setup}: the Powers of Tau artifact (\texttt{pot16\_final.ptau}) provides a universal SRS supporting up to $2^{16}$ constraints. Circuit-specific phase-2 setup uses snarkjs to specialize the SRS to the particular R1CS, producing the proving key (\texttt{.zkey} file, several megabytes per circuit).
-    \item \textbf{Proof generation}: given public inputs and private witnesses, the WASM generator constructs the full witness vector $\mathbf{s}$; snarkjs then computes $(\pi_A, \pi_B, \pi_C)$ using the proving key. In this project, this step executes in the browser using snarkjs with WASM, taking approximately 3--8 seconds for the vote circuit.
+    \item \textbf{Trusted setup}: the Powers of Tau artifact (\texttt{pot16\_final.ptau}) provides a universal SRS supporting up to $2^{16}$ constraints. Circuit-specific phase-2 setup uses snarkjs to specialize the SRS to the particular R1CS, producing the proving key (\texttt{.zkey} file, about 7--10 MB per circuit in this implementation).
+    \item \textbf{Proof generation}: given public inputs and private witnesses, the WASM generator constructs the full witness vector $\mathbf{s}$; snarkjs then computes $(\pi_A, \pi_B, \pi_C)$ using the proving key. In this project, Node.js test-suite measurements place vote-proof generation at approximately 3--8 seconds, while browser-side snarkjs WASM execution is typically similar or moderately slower depending on device hardware.
     \item \textbf{Verifier export}: snarkjs generates a Solidity contract that hard-codes the verification key and implements the pairing-check equation as direct EVM precompile calls, eliminating runtime parsing overhead.
 \end{enumerate}
 
-A key trust property of this pipeline is that the \emph{circuit code is public}: anyone can read \texttt{vote\_proof.circom} and \texttt{tally\_proof.circom}, recompile them, and verify that the resulting R1CS matches the published \texttt{.zkey} artifacts. This auditability---combined with the verifiable Powers of Tau ceremony transcript---means that trust in the system rests on the cryptographic hardness assumptions and the setup ceremony, not on the circuit author's integrity.
+A key trust property of this pipeline is that the \emph{circuit code is public}: anyone can read \texttt{vote\_proof.circom} and \texttt{tally\_proof.circom}, recompile them, and verify that the resulting R1CS matches the corresponding \texttt{.zkey} artifacts when those artifacts are published with the deployment. This auditability---combined with the verifiable Powers of Tau ceremony transcript---means that trust in the system rests on the cryptographic hardness assumptions and the setup ceremony, not on the circuit author's integrity.
 
 \subsection{ZKP Role in This Dissertation}
 
@@ -181,22 +179,26 @@ Three distinct proof instances are deployed, organized into two circuit files:
     \item \textbf{ZKP3 (tally decryption correctness)}: proves that for each candidate $j$, the published result point $\mathbf{results}[j] \cdot G$ equals the point obtained by decrypting the aggregated ciphertext under $sk$, and that $sk$ is consistent with the public key $PK = sk \cdot G$. The integer vote counts are derived off-chain from these curve points via discrete-log recovery, and are submitted to the contract separately; the circuit proves the correctness of the curve-point representations, not the integer values directly. This circuit is necessarily separate because it operates over the aggregated ciphertext state, which is only defined after all votes have been collected.
 \end{enumerate}
 
-The on-chain verifier contracts (\texttt{VoteVerifier.sol}, \texttt{TallyVerifier.sol}), generated automatically by snarkjs, each implement the pairing-check equation as a pure Solidity function. The main \texttt{Voting} contract calls these verifiers as a mandatory precondition for \texttt{castVote} and \texttt{updateTallyResults} respectively, ensuring that no invalid ballot or fabricated tally claim can be committed to the blockchain.
+The on-chain verifier contracts (\texttt{VoteVerifier.sol}, \texttt{TallyVerifier.sol}), generated automatically by snarkjs, each implement the pairing-check equation as a pure Solidity function. The main \texttt{Voting} contract calls these verifiers as a mandatory precondition for \texttt{castVote} and \texttt{updateTallyResults} respectively, enforcing the encoded circuit relations before state updates. Chapter 5 discusses remaining binding gaps that still require hardening for production assurance.
 
 \section{Commitments, Hashing, and Merkle Auditability}
 
-Commitments provide a compact way to bind secret ballot metadata (candidate ID and salt) to a public value. Poseidon is selected as the commitment hash due to circuit efficiency \cite{poseidon2019}. For scalable auditability, commitments are organized into a Merkle tree, and inclusion is verified by logarithmic-size proofs \cite{merkle1988}.
+In this design, a commitment acts as a binding receipt for hidden ballot data. The voter computes a hash from candidate ID and salt, then publishes only the digest. Later edits to either secret value would change that digest, so the original claim cannot be silently rewritten.
 
-This structure supports a useful operational pattern: a voter can validate that their commitment appears in the audited set without revealing identity, and any third party can recompute the root from published entries if ordering rules are deterministic.
+Poseidon is used for this commitment step because it maps efficiently to arithmetic constraints in zk circuits \cite{poseidon2019}. That choice matters in practice: the same hash must be checked inside proof generation, so an expensive circuit hash directly increases proving overhead.
+
+Auditability is then lifted from single commitments to the full ballot set through a Merkle tree \cite{merkle1988}. Each leaf stores one commitment, while the root commits to the entire ordered list. Inclusion proofs grow logarithmically with the number of leaves, which keeps verification cost manageable even as participation scales.
+
+This gives two independent checks. A voter can verify that their own commitment is included under the published root without exposing additional identity information in the verification step. Separately, an external auditor can recompute the root from published entries under a deterministic ordering rule and compare it against both the announced root and the on-chain root value.
 
 \section{Positioning of This Work}
 
-Relative to prior studies, this project emphasizes implementation-level integration rather than only protocol specification. The dissertation focuses on the full engineering chain from browser-side proof generation to contract-level verification and post-election audit tooling.
+This dissertation builds and evaluates the full implementation path, connecting browser-side proof generation, contract-level verification, and post-election audit tooling in one deployable workflow.
 
-The contribution is therefore twofold:
+The contribution has two concrete parts:
 \begin{itemize}
-    \item a functional prototype that demonstrates these techniques working together;
-    \item a transparent assessment of which security goals are complete, partially complete, or still open.
+    \item a working prototype showing that these mechanisms operate together under one architecture;
+    \item an explicit assessment of which security goals are fully met, partially met, or still unresolved.
 \end{itemize}
 
 Table \ref{tab:approach-comparison} summarizes the most relevant architectural tradeoffs for this dissertation.
@@ -213,7 +215,7 @@ Criterion & Centralized E-Voting & Blockchain-Only Voting & This Work (Blockchai
 State transparency & Limited by operator logs & High for on-chain actions & High for control flow and published commitments \\
 Ballot confidentiality & Depends on backend policy & Usually weak if plaintext on-chain & Stronger via encrypted ballots and commitment receipts \\
 Tally verifiability & Operational trust heavy & Moderate unless cryptographic proofs added & High through explicit vote/tally proofs \\
-Voter-side inclusion check & Rare or account-linked & Possible but privacy-sensitive & Receipt-based anonymous Merkle inclusion workflow \\
+Voter-side inclusion check & Rare or account-linked & Possible but privacy-sensitive & Receipt-based Merkle inclusion workflow with reduced address-linkage during verification \\
 Operational complexity & Lower & Moderate & Higher, but with stronger assurance properties \\
 \bottomrule
 \end{tabular}
@@ -221,6 +223,8 @@ Operational complexity & Lower & Moderate & Higher, but with stronger assurance 
 
 \section{Chapter Summary}
 
-This chapter positioned the dissertation against prior e-voting approaches and clarified why combining blockchain transparency with privacy-preserving cryptography is necessary. The review also identified the central design tradeoff: increased implementation complexity in exchange for stronger verifiability and integrity guarantees.
+This chapter situated the dissertation within prior e-voting literature and explained why blockchain transparency alone is insufficient for this problem setting. Strong privacy and trustworthy tally validation require additional cryptographic mechanisms to be integrated into the design.
+
+The review also made the core tradeoff explicit. The proposed architecture introduces higher implementation complexity, but that added complexity buys stronger verifiability and stronger integrity guarantees.
 
 \endgroup

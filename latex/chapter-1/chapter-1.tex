@@ -20,7 +20,7 @@ Building a voting system that does not depend on trusted operators means satisfy
     \item ballot confidentiality across submission, storage, and counting;
     \item correctness checks on vote formation and tally claims that do not reveal ballot contents;
     \item tamper-evident enforcement of election state transitions;
-    \item a voter verification path that requires no disclosure of identity or wallet address.
+    \item a voter verification path where inclusion can be checked from local receipts without address lookup during verification.
 \end{itemize}
 
 Let $V$ be the number of cast ballots and $N$ the number of candidates. Every accepted ballot must encode exactly one valid choice, the aggregate ciphertexts must yield a consistent tally, and the published result must come with cryptographic evidence that anyone can check independently.
@@ -29,7 +29,7 @@ Let $V$ be the number of cast ballots and $N$ the number of candidates. Every ac
 
 Several practical developments make this combination of techniques worth pursuing. Blockchain ledgers maintain append-only event logs with deterministic execution, removing one class of attack---silent rewrites of election state---that centralized backends remain vulnerable to \cite{nakamoto2008,wood2014}. Modern zk-SNARK systems have reached the point where proof sizes are small and on-chain verification fits within smart-contract budgets \cite{groth2016}. Circuit-friendly hash functions and Merkle structures add post-election inclusion checks that scale to large ballot sets without expensive on-chain storage \cite{poseidon2019,merkle1988}.
 
-Taken together, these tools open up a design space where privacy and verifiability no longer need to be traded off against each other, and neither depends on institutional promises to hold.
+Taken together, these tools open up a design space that reduces the privacy-versus-verifiability tradeoff and shifts assurance away from institutional promises toward cryptographic checks and public execution traces.
 
 \section{Research Objectives}
 
@@ -38,7 +38,7 @@ The work targets five outcomes:
     \item a contract-level state machine enforcing explicit lifecycle transitions on the election;
     \item private ballot submission via one-hot ElGamal encryption on BabyJubJub;
     \item Groth16 proofs checking vote legality and tally correctness on-chain;
-    \item an anonymous path to confirm ballot inclusion---just a receipt and a Merkle proof, no identity needed;
+    \item a receipt-based path to confirm ballot inclusion---just a receipt and a Merkle proof, without additional identity disclosure in the verification step;
     \item an honest look at what the implementation gets right and where it comes up short.
 \end{itemize}
 
@@ -63,7 +63,7 @@ Table \ref{tab:rq-mapping} maps each question to where it is evaluated.
 RQ & Evaluation Focus & Primary Evidence Location \\
 \midrule
 RQ1 & End-to-end integration feasibility of client crypto, proof generation, and contract verification & Chapter 4 implementation workflow and Chapter 5 scenario validation \\
-RQ2 & Comparative verifiability gain over centralized e-voting & Chapter 2 positioning and Chapter 5 security analysis \\
+RQ2 & Comparative verifiability gain over centralized e-voting & Chapter 2 positioning (Table \ref{tab:approach-comparison}) and Chapter 5 security analysis \\
 RQ3 & Gap analysis between functional completion and high-assurance completion & Chapter 5 outstanding gaps and Appendix B checklist \\
 \bottomrule
 \end{tabular}
@@ -71,7 +71,7 @@ RQ3 & Gap analysis between functional completion and high-assurance completion &
 
 \section{Scope and Boundaries}
 
-The implemented system targets a single-election deployment model with an administrator-controlled tally key. The solution is designed as a high-confidence prototype and research demonstrator, not a production-national-election platform.
+The implemented system targets a single-election deployment model with an administrator-controlled tally key. This prototype is a reproducible research demonstrator, not a production platform for national elections.
 
 Out-of-scope items include coercion resistance, threshold decryption ceremonies, decentralized governance for election administration, and formal verification of contract bytecode. These are addressed as future work rather than claimed as completed features.
 
@@ -81,8 +81,8 @@ The work produces five concrete outputs:
 \begin{itemize}
     \item a cross-stack prototype---Solidity contracts, Circom circuits, browser-side JavaScript proving, and Python cryptographic validation---compiled, deployed, and independently testable;
     \item a vote-submission mechanism binding the Poseidon commitment and ciphertext hash as public proof signals;
-    \item a tally pipeline that runs homomorphic aggregation and ZKP3 verification, then publishes a Merkle root derived from on-chain commitments;
-    \item a post-election audit path where voters confirm ballot inclusion from a local receipt and an exported bundle, without any address-based lookup;
+    \item a tally pipeline that runs homomorphic aggregation and ZKP3 verification, then publishes a Merkle root for commitment-set auditability under the implementation assumptions analyzed in Chapter 5;
+    \item a post-election audit path where voters confirm ballot inclusion from a local receipt and an exported bundle, without address-based lookup in the verification step;
     \item a requirement-driven gap assessment that names unresolved risks explicitly rather than folding them into general limitations.
 \end{itemize}
 
