@@ -37,7 +37,7 @@
 \AtBeginEnvironment{align*}{\setstretch{1}}               % single spacing for unnumbered align
 \AtEndEnvironment{equation}{}                             % restore after equation
 \numberwithin{equation}{chapter}                          % equation numbering follows chapter
-\renewcommand{\theequation}{\arabic{chapter}.\arabic{equation}}% display as 2.1
+\renewcommand{\theequation}{\thechapter.\arabic{equation}}% display as 2.1 / A.1
 
 % ================================= Footer ================================
 \pagestyle{fancy}                                         % enable fancyhdr
@@ -71,8 +71,7 @@
 % TOC formatting
 % Chapter level
 \renewcommand{\cftchapfont}{\bfseries}                  % bold chapter titles
-\renewcommand\thechapter{\arabic{chapter}}       % chapter number only
-\renewcommand\thesection{\arabic{chapter}.\arabic{section}} % fix section numbering
+\renewcommand\thesection{\thechapter.\arabic{section}} % section numbering follows chapter style
 \renewcommand{\cftchappresnum}{Chapter\enspace}   % "Chapter " prefix in TOC
 \renewcommand{\cftchapaftersnumb}{}                     % nothing after chapter number
 \setlength{\cftchapnumwidth}{7.3em}                       % chapter number width
@@ -92,10 +91,10 @@
 % Numbered \chapter: "Chapter 1" on its own line, title left-aligned below
 \titleformat{\chapter}[display]            % "Chapter 1" on separate line
   {\normalfont\Huge\bfseries}  % Huge, bold
-  {Chapter\enspace\thechapter}             % shows "Chapter 1"
+  {\chaptername\enspace\thechapter}        % shows "Chapter 1" / "Appendix A"
   {0em}                                    % space between number and title
   {\raggedright}                           % title left-aligned
-% Unnumbered \chapter* (Abstract, Appendices, etc.)
+% Unnumbered \chapter* (Abstract, Lists, etc.)
 \titleformat{name=\chapter,numberless}[display]
   {\normalfont\Huge\bfseries}  % Huge, bold
   {}                                       % no number
@@ -151,10 +150,10 @@
 % Custom date format
 \newdateformat{mydate}{\THEDAY\ \monthname[\THEMONTH]\ \THEYEAR}
 % Unified figure/table numbering and caption style
-\renewcommand{\thefigure}{\arabic{chapter}.\arabic{figure}}
+\renewcommand{\thefigure}{\thechapter.\arabic{figure}}
 \setlength{\cftfignumwidth}{4.5em}
 \renewcommand{\figurename}{Figure}
-\renewcommand{\thetable}{\arabic{chapter}.\arabic{table}}
+\renewcommand{\thetable}{\thechapter.\arabic{table}}
 \setlength{\cfttabnumwidth}{4.5em}
 \renewcommand{\tablename}{Table}
 \captionsetup{
@@ -172,6 +171,7 @@
     \begingroup
     \vspace{-2em} % reduce top spacing
     \chapter*{\listfigurename}%
+    \addcontentsline{toc}{chapter}{\listfigurename}%
     \@starttoc{lof}%
     \endgroup
 }
@@ -182,6 +182,7 @@
     \begingroup
     \vspace{-2em} % reduce top spacing
     \chapter*{\listtablename}%
+    \addcontentsline{toc}{chapter}{\listtablename}%
     \@starttoc{lot}%
     \endgroup
 }
@@ -235,6 +236,9 @@
 
 % ============================== Appendix ==============================
 \appendix
+\renewcommand{\chaptername}{Appendix}
+\addtocontents{toc}{\protect\renewcommand{\protect\cftchappresnum}{Appendix\enspace}}
+\addtocontents{toc}{\protect\setlength{\protect\cftchapnumwidth}{8.3em}}
 \input{c-back-matter/appendix-a} % Appendix A
 \input{c-back-matter/appendix-b} % Appendix B
 
