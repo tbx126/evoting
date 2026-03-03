@@ -11,16 +11,16 @@ Electronic voting promises faster tallies, broader access, and auditable records
 
 Centralized e-voting platforms handle usability and speed well enough, but they shift the burden of trust onto whoever runs the backend. That operator controls the logs, enforces state transitions, and publishes the tally---and independent verification only goes as far as what they choose to share. When a result is contested, investigation typically stalls at the boundary of privileged access rather than resolving through any publicly verifiable mechanism.
 
-This dissertation takes a different path: a blockchain-based architecture that replaces operator trust with on-chain enforcement and cryptographic guarantees. ElGamal homomorphic encryption, Groth16 zero-knowledge proofs, and commitment-based Merkle inclusion proofs are combined into a single end-to-end pipeline. The aim is not a theoretical sketch but a working system---one that can be compiled, deployed, tested, and independently reviewed.
+This dissertation takes a different path: it shifts assurance from institutional trust toward on-chain enforcement and cryptographic proofs; key custody remains an explicit trust assumption. ElGamal homomorphic encryption, Groth16 zero-knowledge proofs, and commitment-based Merkle inclusion proofs are combined into a single end-to-end pipeline. The aim is not a theoretical sketch but a working system---one that can be compiled, deployed, tested, and independently reviewed.
 
 \section{Problem Statement}
 
-Building a voting system that does not depend on trusted operators means satisfying a set of requirements that do not all point in the same direction:
+Building a voting system that minimises dependence on trusted operators means satisfying a set of requirements that do not all point in the same direction:
 \begin{itemize}
     \item ballot confidentiality across submission, storage, and counting;
     \item correctness checks on vote formation and tally claims that do not reveal ballot contents;
     \item tamper-evident enforcement of election state transitions;
-    \item a voter verification path where inclusion can be checked from local receipts without address lookup during verification.
+    \item a voter verification path where inclusion can be confirmed using a local receipt together with a published audit bundle, including a root-consistency check against on-chain \texttt{merkleRoot}, without address-based lookup during verification.
 \end{itemize}
 
 Let $V$ be the number of cast ballots and $N$ the number of candidates. Every accepted ballot must encode exactly one valid choice, the aggregate ciphertexts must yield a consistent tally, and the published result must come with cryptographic evidence that anyone can check independently.
@@ -38,7 +38,7 @@ The work targets five outcomes:
     \item a contract-level state machine enforcing explicit lifecycle transitions on the election;
     \item private ballot submission via one-hot ElGamal encryption on BabyJubJub;
     \item Groth16 proofs checking vote legality and tally correctness on-chain;
-    \item a receipt-based path to confirm ballot inclusion---just a receipt and a Merkle proof, without additional identity disclosure in the verification step;
+    \item a receipt-driven audit path where voters confirm ballot inclusion using a local receipt and a published audit bundle, including bundle-root consistency checks against on-chain \texttt{merkleRoot}, without additional identity disclosure in the verification step;
     \item an honest look at what the implementation gets right and where it comes up short.
 \end{itemize}
 
@@ -47,7 +47,7 @@ The work targets five outcomes:
 Three questions shape how the implementation is built and assessed:
 \begin{itemize}
     \item \textbf{RQ1}: Is it feasible to integrate encrypted one-hot ballots and ZKP-based checks into a browser-to-chain workflow without relying on trusted middleware?
-    \item \textbf{RQ2}: Does the resulting pipeline offer stronger verifiability than centralized log-based auditing?
+    \item \textbf{RQ2}: Does the resulting pipeline offer stronger verifiability than centralized log-based auditing (assessed by whether tally claims are independently replayable without privileged data access, and whether voters can complete inclusion verification without any server contact)?
     \item \textbf{RQ3}: Of the target security guarantees, which are fully realized in the current code, and which fall short due to specific engineering gaps?
 \end{itemize}
 
@@ -63,8 +63,8 @@ Table \ref{tab:rq-mapping} maps each question to where it is evaluated.
 RQ & Evaluation Focus & Primary Evidence Location \\
 \midrule
 RQ1 & End-to-end integration feasibility of client crypto, proof generation, and contract verification & Chapter 4 implementation workflow and Chapter 5 scenario validation \\
-RQ2 & Comparative verifiability gain over centralized e-voting & Chapter 2 positioning (Table \ref{tab:approach-comparison}) and Chapter 5 security analysis \\
-RQ3 & Gap analysis between functional completion and high-assurance completion & Chapter 5 outstanding gaps and Appendix B checklist \\
+RQ2 & Comparative verifiability gain over centralized e-voting (by independent replayability and no-server voter verification) & Chapter 2 positioning (Table \ref{tab:approach-comparison}) and Chapter 5 security analysis \\
+RQ3 & Gap analysis between functional completion and high-assurance completion & Chapter 5 outstanding gaps and Appendix~\ref{tab:acceptance-checklist} checklist \\
 \bottomrule
 \end{tabular}
 \end{table}

@@ -10,17 +10,18 @@
 \section{Roles, Assets, and Trust Boundaries}
 
 The protocol defines three active roles: administrator, registered voter, and public verifier. The main protected assets are ballot confidentiality, result correctness, and audit trace integrity.
+A public verifier is any party that can read blockchain data without credentials: they can observe on-chain state transitions, inspect proof-verification outcomes, and run the audit procedure in Section 3.9 using the published audit bundle.
 
 Trust boundaries are split as follows:
 \begin{itemize}
     \item \textbf{On-chain boundary}: election state transitions and proof-verification outcomes are publicly observable and tamper-evident.
     \item \textbf{Client boundary}: ballot construction, witness generation, and receipt storage occur in user-controlled runtime environments.
-    \item \textbf{Administrator boundary}: tally decryption key custody and result submission remain operationally sensitive.
+    \item \textbf{Administrator boundary}: tally decryption key custody, result submission, and voter-registration whitelist administration remain operationally sensitive; whitelist correctness is controlled unilaterally and cannot be independently verified from on-chain data alone.
 \end{itemize}
 
 \section{Threat Model}
 
-The model considers malicious voters and passive blockchain observers. For administrator behavior, the prototype assumes an \emph{honest-but-curious} operator for key custody: the administrator is expected to follow the protocol, while single-key control remains an explicit trust assumption rather than a cryptographically enforced guarantee. The following attacks are explicitly targeted:
+The model considers malicious voters and passive blockchain observers. For administrator behavior, the prototype assumes a \emph{semi-trusted administrator}: the administrator is expected to follow the protocol, while single-key control remains an explicit trust assumption rather than a cryptographically enforced guarantee. The following attacks are explicitly targeted:
 \begin{itemize}
     \item invalid ballot shape (non-one-hot encryption);
     \item out-of-range candidate encoding;
@@ -29,6 +30,24 @@ The model considers malicious voters and passive blockchain observers. For admin
 \end{itemize}
 
 The following are not fully solved in the current prototype: coercion resistance, malware-compromised browser clients, threshold key governance, fully adversarial administrator behavior (for example refusing to tally or submitting inconsistent off-chain artifacts), and per-candidate integer-to-result-point binding at contract layer (ZKP3 constrains curve-point correctness, while integer mapping remains client-verifiable rather than contract-enforced).
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Threat Model Mapping Matrix}
+\label{tab:threat-matrix}
+\begin{tabular}{L{2.0cm} L{2.6cm} L{2.2cm} L{2.8cm} L{2.8cm}}
+\toprule
+Attacker & Attack method & Target property & Control mechanism & Residual risk \\
+\midrule
+Malicious voter & Submit non-one-hot or out-of-range encoding & Tally integrity & ZKP1/2 + contract range checks & Compromised client runtime can still submit seemingly valid inputs \\
+Malicious voter & Replay/duplicate voting & One-person-one-vote & Registry whitelist + hasVoted gate & Credential theft/abuse is outside this model \\
+Semi-trusted administrator & Infer individual ballot content & Ballot secrecy & ElGamal encryption + aggregate-only decryption + ZKP3 & Single-key custody remains a trust assumption \\
+Adversarial administrator & Refuse tally or submit inconsistent off-chain artifacts & Availability/auditability & On-chain state machine + proof gates & Denial-of-service and off-chain artifact inconsistency not fully eliminated \\
+Adversarial administrator & Alter per-candidate integer distribution (same total) & Per-candidate tally authenticity & Client-side point-to-integer recheck & Contract layer does not strongly bind integers to result points (C1 gap) \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Protocol State Machine}
 
@@ -143,7 +162,8 @@ H_{ct} = \mathsf{Poseidon}(&\mathit{c1X}_0,\,\mathit{c1Y}_0,\,\mathit{c2X}_0,\,\
 \end{split}
 \end{equation}
 
-The vote proof uses $(\mathit{Com}, H_{ct}, pk_X, pk_Y)$ as public signals and proves consistency between commitment, candidate index, and encrypted one-hot structure.
+The vote proof uses $(\mathit{Com}, H_{ct}, PK_x, PK_y)$ as public signals and proves consistency between commitment, candidate index, and encrypted one-hot structure.
+Here, $PK_x, PK_y$ denote affine coordinates of $\mathit{PK}$.
 In the reference tally client, each emitted ciphertext payload is re-hashed off-chain and matched against the on-chain vote record $(\mathit{commitment}, \mathit{ciphertextHash})$ before aggregation; mismatched entries are excluded from the tally set. This is a client-side integrity requirement rather than a contract-enforced invariant.
 
 \section{Vote Proof Constraints}
@@ -179,7 +199,8 @@ The tally circuit proves:
     \item sum consistency of all result points with total vote count.
 \end{itemize}
 
-In the current prototype, ZKP3 binds correctness of result \emph{points}. The contract additionally publishes these result points from ZKP public signals so auditors can verify consistency between published integers and point-form tally evidence; however, per-candidate integer-to-point binding is not enforced by contract constraints.
+The contract also checks that submitted $\mathit{totalVotes}$ matches its internal on-chain vote counter before accepting the proof, bridging circuit-level constraints and ledger state.
+In the current prototype, ZKP3 binds correctness of result \emph{points}. The contract writes these result points into on-chain state and emits them in a tally event so auditors can verify consistency between published integers and point-form tally evidence; however, per-candidate integer-to-point binding is not enforced by contract constraints.
 
 \section{Merkle Audit Construction}
 
@@ -196,7 +217,7 @@ Internal nodes are built using Keccak over ordered child pair:
 Leaf values remain Poseidon commitments already produced by the vote circuit, while internal nodes use Keccak256 for EVM-native compatibility in audit tooling.
 If a layer has odd cardinality, the last node is duplicated. Commitments are sorted by
 \texttt{blockNumber}, \texttt{transactionIndex}, and \texttt{logIndex} before tree construction; this yields deterministic roots provided all implementations apply the same ordering.
-After tally finalization, the contract rejects \texttt{merkleRoot} updates, preserving the audit digest as immutable state.
+After tally finalization, the contract rejects \texttt{merkleRoot} updates through a Tallied-state guard, preserving the audit digest as immutable state.
 
 \section{Anonymous Verification Procedure}
 

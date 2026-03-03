@@ -9,7 +9,7 @@
 
 \section{Security Requirements of E-Voting}
 
-A credible e-voting system must satisfy at least four properties: eligibility control, ballot secrecy, integrity of counting, and auditability. Classical protocol literature adds finer distinctions---individual verifiability (a voter confirms their own ballot was counted), universal verifiability (any observer can check tally consistency), and receipt-freeness or coercion resistance \cite{benaloh1994,chaum2004,juels2005}.
+A credible e-voting system must satisfy at least four properties: eligibility control, ballot secrecy, integrity of counting, and auditability. Classical protocol literature adds finer distinctions---individual verifiability (a voter confirms their own ballot was counted), universal verifiability (any observer can check tally consistency), and receipt-freeness and coercion resistance (related but not equivalent properties) \cite{benaloh1994,chaum2004,juels2005}.
 
 In practice, these requirements split across cryptographic and operational controls. Cryptography can confirm that certain relations hold. It cannot, however, guarantee endpoint security, key governance, or anti-coercion behaviour in an uncontrolled environment. That gap matters when reading claims of ``secure voting''.
 
@@ -32,7 +32,7 @@ Transparency cuts both ways, though. If vote semantics appear in plaintext, conf
 
 \section{Homomorphic Encryption for Private Tally}
 
-ElGamal encryption on elliptic-curve discrete-log groups supports additive homomorphism over encoded messages \cite{elgamal1985,hankerson2004ecc}. Each ballot is encoded as a one-hot vector; component-wise aggregation of ciphertexts gives encrypted candidate totals. Decrypting only the aggregates avoids exposing individual ballots.
+ElGamal encryption on elliptic-curve discrete-log groups supports additive homomorphism over encoded messages \cite{elgamal1985,hankerson2004ecc}. This work instantiates ElGamal on BabyJubJub, which is defined over the BN254 scalar field and therefore admits native arithmetic in Groth16 circuits without field-conversion overhead. Each ballot is encoded as a one-hot vector; component-wise aggregation of ciphertexts gives encrypted candidate totals. Decrypting only the aggregates avoids exposing individual ballots.
 
 Two practical advantages follow. Ciphertext aggregation scales linearly with vote count using simple point additions; recovering final integer totals from decrypted points is a separate off-chain discrete-log step. Privacy holds as long as secret-key exposure and plaintext side channels stay controlled---a weaker guarantee than threshold decryption, but achievable without ceremony infrastructure.
 
@@ -52,7 +52,7 @@ In this project, two instances of this pattern apply:
 \begin{itemize}
     \item \textbf{Vote proof}: the public statement and witness are
     \begin{align*}
-    x &= (\mathit{commitment},\; H_{ct},\; pk_X,\; pk_Y) \\
+    x &= (\mathit{commitment},\; H_{ct},\; PK_x,\; PK_y) \\
     w &= (\mathit{candidateId},\; \mathit{salt},\; r_0, \dots, r_{N-1},\\
        &\quad \mathit{c1X}_0,\; \mathit{c1Y}_0,\; \mathit{c2X}_0,\; \mathit{c2Y}_0,\; \dots,\; \mathit{c1X}_{N-1},\; \mathit{c1Y}_{N-1},\; \mathit{c2X}_{N-1},\; \mathit{c2Y}_{N-1})
     \end{align*}
@@ -60,12 +60,12 @@ In this project, two instances of this pattern apply:
     \item \textbf{Tally proof}: $w = sk$, with public statement
     \begin{equation*}
         \begin{split}
-        x = (&pk_X,\; pk_Y,\; \bar{C1}^{X}_0,\; \bar{C1}^{Y}_0,\; \dots,\; \bar{C1}^{X}_{N-1},\; \bar{C1}^{Y}_{N-1},\\
+        x = (&PK_x,\; PK_y,\; \bar{C1}^{X}_0,\; \bar{C1}^{Y}_0,\; \dots,\; \bar{C1}^{X}_{N-1},\; \bar{C1}^{Y}_{N-1},\\
              &\bar{C2}^{X}_0,\; \bar{C2}^{Y}_0,\; \dots,\; \bar{C2}^{X}_{N-1},\; \bar{C2}^{Y}_{N-1},\\
              &R^{X}_0,\; R^{Y}_0,\; \dots,\; R^{X}_{N-1},\; R^{Y}_{N-1},\; \mathit{totalVotes})
         \end{split}
     \end{equation*}
-    where $R^{X}_j$, $R^{Y}_j$ are the coordinates of the result point $\mathbf{results}[j] \cdot G$ for candidate $j$, and $\mathit{totalVotes}$ is the expected sum of all candidate totals (corresponding to $V$ in Chapter 1).
+    where $R_j = n_j \cdot G$ is the result point for candidate $j$, $R^{X}_j$, $R^{Y}_j$ are the coordinates of $R_j$, $n_j$ is the corresponding integer vote count, and $\mathit{totalVotes}$ is the expected sum of all candidate totals (corresponding to $V$ in Chapter 1). Here, $PK_x, PK_y$ denote affine coordinates of $\mathit{PK}$.
 \end{itemize}
 
 \subsection{Formal Security Properties}
@@ -74,7 +74,7 @@ A ZKP system must satisfy three properties \cite{goldwasser1989}:
 \begin{enumerate}
     \item \textbf{Completeness}: If $(x, w) \in \mathcal{R}$, then an honest prover holding $w$ always produces a proof $\pi$ that the verifier accepts. This guarantees that valid ballots and correct tallies are never falsely rejected.
     \item \textbf{Soundness}: If no valid witness $w$ exists for statement $x$, then no computationally bounded adversary can produce an accepted proof except with negligible probability. This prevents fabricated ballots or incorrect tally claims from being accepted on-chain.
-    \item \textbf{Zero-Knowledge}: A simulator can produce proofs indistinguishable from real proofs without knowing $w$. This formalizes that $\pi$ reveals nothing about $w$ beyond the existence of a valid witness.
+    \item \textbf{Zero-Knowledge}: A simulator can produce proofs with the same distribution as real proofs without knowing $w$. This formalizes that $\pi$ reveals nothing about $w$ beyond the existence of a valid witness.
 \end{enumerate}
 
 In a zk-SNARK, soundness is computational (relying on cryptographic hardness assumptions), and non-interactivity is achieved through a structured reference string (SRS) produced in a trusted setup. The SRS provides the cryptographic parameters needed for proving and verification without any round-trip interaction.
@@ -127,7 +127,7 @@ Groth16 implements the QAP argument using bilinear pairings over elliptic curves
 \paragraph{Setup.}
 A trusted party samples secrets $(\tau, \alpha, \beta, \gamma, \delta) \overset{\$}{\leftarrow} \mathbb{F}_p^5$ and computes two structured reference strings:
 \begin{itemize}
-    \item \textbf{Proving key} $\mathit{pk}$: contains $\{[\tau^i]_1\}$ for required powers, $\{[u_j(\tau)]_1\}$, $\{[v_j(\tau)]_2\}$, and blinded combinations---tens of thousands of elliptic-curve points for circuits of this scale.
+    \item \textbf{Proving key} $\mathit{pk}_{\mathit{Groth}}$: contains $\{[\tau^i]_1\}$ for required powers, $\{[u_j(\tau)]_1\}$, $\{[v_j(\tau)]_2\}$, and blinded combinations---tens of thousands of elliptic-curve points for circuits of this scale (notation distinguished from ElGamal public key $\mathit{PK}$ and coordinates $PK_x,PK_y$).
     \item \textbf{Verification key} $\mathit{vk}$: contains $[\alpha]_1$, $[\beta]_2$, $[\gamma]_2$, $[\delta]_2$, and $\{[(\beta u_j + \alpha v_j + w_j)(\tau)/\gamma]_1\}$ for the public signal indices.
 \end{itemize}
 
@@ -176,14 +176,14 @@ Three distinct proof instances are deployed, organized into two circuit files:
 \begin{enumerate}
     \item \textbf{ZKP1 (commitment correctness)}: proves $\mathit{commitment} = \mathsf{Poseidon}(\mathit{candidateId}, \mathit{salt})$ without revealing $\mathit{candidateId}$ or $\mathit{salt}$.
     \item \textbf{ZKP2 (one-hot validity)}: proves that the submitted ElGamal ciphertexts encrypt precisely the one-hot vector $\mathbf{m}$ consistent with the committed candidate, without revealing $\mathbf{m}$ or the per-component randomness. Because ZKP1 and ZKP2 share witness variables (both depend on $\mathit{candidateId}$), they are compiled into a single \texttt{vote\_proof} circuit. A single proof simultaneously establishes both properties.
-    \item \textbf{ZKP3 (tally decryption correctness)}: proves that for each candidate $j$, the published result point $\mathbf{results}[j] \cdot G$ equals the point obtained by decrypting the aggregated ciphertext under $sk$, and that $sk$ is consistent with the public key $PK = sk \cdot G$. The integer vote counts are derived off-chain from these curve points via discrete-log recovery, and are submitted to the contract separately; the circuit proves the correctness of the curve-point representations, not the integer values directly. This circuit is necessarily separate because it operates over the aggregated ciphertext state, which is only defined after all votes have been collected.
+    \item \textbf{ZKP3 (tally decryption correctness)}: proves that for each candidate $j$, the published result point $R_j = n_j \cdot G$ equals the point obtained by decrypting the aggregated ciphertext under $sk$, and that $sk$ is consistent with the public key $PK = sk \cdot G$. The integer vote counts are derived off-chain from these curve points via discrete-log recovery, and are submitted to the contract separately; the circuit proves the correctness of the curve-point representations, not the integer values directly. This circuit is necessarily separate because it operates over the aggregated ciphertext state, which is only defined after all votes have been collected.
 \end{enumerate}
 
 The on-chain verifier contracts (\texttt{VoteVerifier.sol}, \texttt{TallyVerifier.sol}), generated automatically by snarkjs, each implement the pairing-check equation as a pure Solidity function. The main \texttt{Voting} contract calls these verifiers as a mandatory precondition for \texttt{castVote} and \texttt{updateTallyResults} respectively, enforcing the encoded circuit relations before state updates. Chapter 5 discusses remaining binding gaps that still require hardening for production assurance.
 
 \section{Commitments, Hashing, and Merkle Auditability}
 
-In this design, a commitment acts as a binding receipt for hidden ballot data. The voter computes a hash from candidate ID and salt, then publishes only the digest. Later edits to either secret value would change that digest, so the original claim cannot be silently rewritten.
+In this design, a commitment acts as a binding receipt for hidden ballot data. The voter computes a hash from candidate ID and salt, then publishes only the digest. Later edits to either secret value would change that digest, so the original claim cannot be silently rewritten. Because the salt $s$ is sampled uniformly at random and kept private, the commitment is also hiding: the digest alone reveals no information about $\mathit{candidateId}$.
 
 Poseidon is used for this commitment step because it maps efficiently to arithmetic constraints in zk circuits \cite{poseidon2019}. That choice matters in practice: the same hash must be checked inside proof generation, so an expensive circuit hash directly increases proving overhead.
 

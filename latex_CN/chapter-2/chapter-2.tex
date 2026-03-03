@@ -177,7 +177,7 @@ BN254 曲线（亦称 BN128）在 EVM 中通过地址 \texttt{0x08} 的预编译
 \begin{enumerate}
     \item \textbf{ZKP1（承诺正确性）}：证明 $\mathit{commitment} = \mathsf{Poseidon}(\mathit{candidateId}, \mathit{salt})$，且不泄露 $\mathit{candidateId}$ 与 $\mathit{salt}$。
     \item \textbf{ZKP2（one-hot 合法性）}：证明提交的 ElGamal 密文确实加密了与承诺候选项一致的 one-hot 向量 $\mathbf{m}$，且不泄露 $\mathbf{m}$ 与分量随机数。由于 ZKP1 与 ZKP2 共享见证变量（均依赖 $\mathit{candidateId}$），两者被编译为同一 \texttt{vote\_proof} 电路，单个证明即可同时成立。
-    \item \textbf{ZKP3（计票解密正确性）}：证明对每个候选人 $j$，公开结果点 $\mathbf{results}[j] \cdot G$ 等于在私钥 $sk$ 下对聚合密文解密得到的点，且 $sk$ 与公钥 $PK = sk \cdot G$ 一致。整数票数通过离散对数恢复在链下计算并单独提交；该电路证明的是曲线点表示的正确性，而非直接证明整数值。该电路必须独立存在，因为其输入依赖投票结束后的聚合密文状态。
+    \item \textbf{ZKP3（计票解密正确性）}：证明对每个候选人 $j$，公开结果点 $R_j = n_j \cdot G$ 等于在私钥 $sk$ 下对聚合密文解密得到的点，且 $sk$ 与公钥 $PK = sk \cdot G$ 一致。整数票数通过离散对数恢复在链下计算并单独提交；该电路证明的是曲线点表示的正确性，而非直接证明整数值。该电路必须独立存在，因为其输入依赖投票结束后的聚合密文状态。
 \end{enumerate}
 
 由 snarkjs 自动生成的链上验证器（\texttt{VoteVerifier.sol}、\texttt{TallyVerifier.sol}）分别以纯 Solidity 实现配对校验方程。主合约 \texttt{Voting} 在 \texttt{castVote} 与 \texttt{updateTallyResults} 中将其作为强制前置条件，从而在状态更新前执行电路关系约束。第 5 章将讨论仍需加固的绑定缺口。
@@ -229,4 +229,6 @@ BN254 曲线（亦称 BN128）在 EVM 中通过地址 \texttt{0x08} 的预编译
 文献综述同时揭示了核心权衡：所提架构提高了实现复杂度，但这种复杂度换来了更强的可验证性与完整性保证。
 
 \endgroup
+
+
 
