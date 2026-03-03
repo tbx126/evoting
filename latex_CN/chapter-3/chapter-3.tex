@@ -1,0 +1,272 @@
+﻿\chapter{系统模型与方法}
+\begingroup
+\justifying
+\setlength{\parindent}{0pt}
+\setstretch{1.5}
+\setlength{\parskip}{0.5\baselineskip}
+\titlespacing{\chapter}{0pt}{0pt}{0pt}
+\titlespacing{\section}{0pt}{0pt}{0pt}
+
+\section{角色、资产与信任边界}
+
+协议定义三类主动角色：管理员、已注册选民与公开验证者。核心受保护资产为选票机密性、结果正确性与审计轨迹完整性。
+其中“公开验证者”指任何可读取区块链数据且不持有权限凭据的参与方：其可观察链上状态迁移、检查证明验证结果，并使用公开审计包执行第 3.9 节匿名验证流程。
+信任边界划分如下：
+\begin{itemize}
+    \item \textbf{链上边界}：选举状态迁移与证明验证结果公开可见且可篡改留痕。
+    \item \textbf{客户端边界}：选票构造、见证生成与回执存储在用户控制的运行环境中完成。
+    \item \textbf{管理员边界}：计票解密私钥保管、结果提交流程与选民注册白名单管理仍具运行敏感性；其中白名单正确性由管理员单方控制，无法仅凭链上数据独立验证。
+\end{itemize}
+
+\section{威胁模型}
+
+模型考虑恶意选民与被动链上观察者。对于管理员行为，原型采用\emph{半可信管理员}假设：管理员预期遵守协议流程，但单密钥控制仍是显式信任假设，而非由密码机制强制消除。模型显式覆盖以下攻击：
+\begin{itemize}
+    \item 非法选票结构（非 one-hot 加密）；
+    \item 越界候选人编码；
+    \item 重放或重复投票尝试；
+    \item 缺乏有效证明支撑的伪造计票声明。
+\end{itemize}
+
+当前原型尚未完全解决的风险包括：抗胁迫能力、浏览器客户端受恶意软件控制、门限密钥治理、完全对抗型管理员行为（例如拒绝计票或提交不一致链下工件），以及候选人维度“整数结果到曲线点结果”的合约层强绑定（ZKP3 约束曲线点正确性，而整数映射仍依赖客户端可验证而非合约强制）。
+
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{威胁模型映射矩阵}
+\label{tab:threat-matrix}
+\begin{tabular}{L{2.0cm} L{2.6cm} L{2.2cm} L{2.8cm} L{2.8cm}}
+\toprule
+攻击者 & 攻击手段 & 目标属性 & 控制机制 & 剩余风险 \\
+\midrule
+恶意选民 & 提交非 one-hot 或越界编码 & 计票完整性 & ZKP1/2 + 合约范围校验 & 浏览器端被控时仍可能提交“看似合法”输入 \\
+恶意选民 & 重放/重复投票 & 一人一票 & 注册白名单 + hasVoted 门禁 & 身份凭据被盗用不在本模型内 \\
+半可信管理员 & 试图推断个体投票内容 & 选票保密 & ElGamal 加密 + 仅聚合解密 + ZKP3 & 单密钥托管仍是信任假设 \\
+对抗型管理员 & 提交不一致链下工件或拒绝计票 & 可用性/可审计性 & 链上状态机与证明门禁 & 拒绝服务与链下工件不一致未完全消除 \\
+对抗型管理员 & 篡改逐候选人整数分布（总票不变） & 逐候选人结果真实性 & 客户端可复验点-整数映射 & 合约层未强绑整数到结果点（C1 缺口） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{协议状态机}
+
+选举生命周期状态定义为：
+\begin{equation}
+S = \{\texttt{Created},\ \texttt{Active},\ \texttt{Ended},\ \texttt{Tallied}\}
+\end{equation}
+
+允许迁移路径为：
+\begin{equation}
+\texttt{Created} \rightarrow \texttt{Active} \rightarrow \texttt{Ended} \rightarrow \texttt{Tallied}
+\end{equation}
+
+该确定性状态机保证仅在激活阶段允许投票提交，且仅在选举结束后允许计票定稿。
+
+表 \ref{tab:state-transition-guards} 给出了协议层面的迁移守卫条件。
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{状态迁移守卫与拒绝规则}
+\label{tab:state-transition-guards}
+\begin{tabular}{L{2.8cm} L{1.8cm} L{6.2cm}}
+\toprule
+迁移 & 执行方 & 守卫条件与拒绝行为 \\
+\midrule
+\texttt{Created} $\rightarrow$ \texttt{Active} & 管理员 & \texttt{startElection()} 要求候选人数与电路基数一致，否则合约回滚。 \\
+\texttt{Active} $\rightarrow$ \texttt{Ended} & 管理员 & \texttt{endElection()} 仅在激活状态可执行，否则合约回滚。 \\
+\texttt{Ended} $\rightarrow$ \texttt{Tallied} & 管理员 & \texttt{updateTallyResults()} 要求 ZKP3 有效、公钥公开信号匹配且总票数一致，否则合约回滚。 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+图 \ref{fig:protocol-flow} 总结了管理员、选民与智能合约之间的完整交互流程。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm]
+    \node[draw, rounded corners, minimum width=8.6cm, minimum height=0.95cm] (a) at (0,0) {1) 初始化：管理员部署合约并发布 ElGamal 公钥};
+    \node[draw, rounded corners, minimum width=8.6cm, minimum height=0.95cm] (b) at (0,-1.5) {2) 投票：选民加密 one-hot 选票并生成投票证明};
+    \node[draw, rounded corners, minimum width=8.6cm, minimum height=0.95cm] (c) at (0,-3.0) {3) 链上验证：合约校验 Groth16 证明并记录承诺值};
+    \node[draw, rounded corners, minimum width=8.6cm, minimum height=0.95cm] (d) at (0,-4.5) {4) 计票：管理员聚合密文、解密总票并提交 ZKP3};
+    \node[draw, rounded corners, minimum width=8.6cm, minimum height=0.95cm] (e) at (0,-6.0) {5) 审计：选民基于 Merkle 证明验证回执承诺};
+
+    \draw[->, thick] (a) -- (b);
+    \draw[->, thick] (b) -- (c);
+    \draw[->, thick] (c) -- (d);
+    \draw[->, thick] (d) -- (e);
+\end{tikzpicture}
+\caption{端到端协议流程}
+\label{fig:protocol-flow}
+\end{figure}
+
+图 \ref{fig:protocol-sequence} 以时序视角展示同一流程，并显式标注消息方向。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm]
+    \node[draw, minimum width=2.8cm, minimum height=0.75cm] (voter) at (0,0) {选民客户端};
+    \node[draw, minimum width=3.2cm, minimum height=0.75cm] (chain) at (5.0,0) {投票合约};
+    \node[draw, minimum width=2.8cm, minimum height=0.75cm] (admin) at (10.0,0) {管理员客户端};
+
+    \draw[dashed] (0,-0.45) -- (0,-7.1);
+    \draw[dashed] (5.0,-0.45) -- (5.0,-7.1);
+    \draw[dashed] (10.0,-0.45) -- (10.0,-7.1);
+
+    \draw[->, thick] (0,-1.0) -- (5.0,-1.0);
+    \node[font=\scriptsize, align=center] at (2.5,-0.72) {castVote(commitment, ciphertextHash, ZKP1/2)};
+
+    \draw[->, thick] (5.0,-1.8) -- (0,-1.8);
+    \node[font=\scriptsize, align=center] at (2.5,-1.52) {交易回执（事件确认承诺已上链）};
+
+    \draw[->, thick] (10.0,-2.8) -- (5.0,-2.8);
+    \node[font=\scriptsize, align=center] at (7.5,-2.52) {查询加密投票事件};
+
+    \draw[->, thick] (5.0,-3.6) -- (10.0,-3.6);
+    \node[font=\scriptsize, align=center] at (7.5,-3.32) {用于同态聚合的事件日志};
+
+    \draw[->, thick] (10.0,-4.8) -- (5.0,-4.8);
+    \node[font=\scriptsize, align=center] at (7.5,-4.52) {updateTallyResults(results, root, ZKP3)};
+
+    \draw[->, thick] (5.0,-5.8) -- (0,-5.8);
+    \node[font=\scriptsize, align=center] at (2.5,-5.52) {公开计票结果 + merkleRoot 用于审计验证};
+\end{tikzpicture}
+\caption{投票与计票协议时序图}
+\label{fig:protocol-sequence}
+\end{figure}
+
+\section{选票编码与加密}
+
+设 $N$ 为候选人数，$\mathit{candidateId} \in \{0,1,\dots,N-1\}$ 为所选候选人索引。选票编码为 one-hot 向量
+$\mathbf{m}=(m_0,\dots,m_{N-1})$，其中 $m_{\mathit{candidateId}}=1$，其余分量均为 $0$。
+
+对每个候选位置 $j$，在 BabyJubJub 上生成 ElGamal 密文：
+\begin{equation}
+C1_j = r_j \cdot G, \quad C2_j = m_j \cdot G + r_j \cdot \mathit{PK}
+\end{equation}
+其中 $r_j$ 从 BabyJubJub 标量域均匀采样，$G$ 为生成元，$\mathit{PK}$ 为管理员公钥。上述记号在一般 $N$ 下成立；当前部署原型实例化为 $N=2$，并在合约层强制该基数。
+
+\section{承诺与密文绑定}
+
+给定随机盐值 $s$，承诺定义为：
+\begin{equation}
+\mathit{Com} = \mathsf{Poseidon}(\mathit{candidateId},\, s)
+\end{equation}
+
+密文绑定哈希定义为全部密文坐标的 Poseidon 哈希：
+\begin{equation}
+\begin{split}
+H_{ct} = \mathsf{Poseidon}(&\mathit{c1X}_0,\,\mathit{c1Y}_0,\,\mathit{c2X}_0,\,\mathit{c2Y}_0,\,\dots,\\
+                  &\mathit{c1X}_{N-1},\,\mathit{c1Y}_{N-1},\,\mathit{c2X}_{N-1},\,\mathit{c2Y}_{N-1})
+\end{split}
+\end{equation}
+
+投票证明以 $(\mathit{Com}, H_{ct}, PK_x, PK_y)$ 作为公开信号，证明承诺值、候选人索引与加密 one-hot 结构的一致性。
+其中 $PK_x, PK_y$ 为点 $\mathit{PK}$ 的仿射坐标。
+在参考计票客户端中，系统会对事件中每条密文载荷进行链下重哈希，并与链上投票记录 $(\mathit{commitment}, \mathit{ciphertextHash})$ 比对，不匹配条目将被排除在计票集合外。该完整性要求目前属于客户端约束，而非合约强制不变量。
+
+\section{投票证明约束}
+
+投票电路强制四类约束：
+\begin{enumerate}
+    \item \textbf{承诺一致性}：公开承诺值必须等于私密候选索引与盐值的 Poseidon 哈希；
+    \item \textbf{范围校验}：候选索引必须严格小于配置候选人数；
+    \item \textbf{one-hot 加密合法性}：被选索引位置密文对应值为 1，其余位置为 0；
+    \item \textbf{密文绑定}：公开密文哈希必须等于全部密文分量的 Poseidon 哈希。
+\end{enumerate}
+
+该组合保证被接受投票在协议规则下同时满足语法合法性与语义合法性。
+
+\section{同态计票与计票证明}
+
+对每个候选位置 $j$，聚合密文通过跨全部投票的点加法得到：
+\begin{equation}
+\bar{C1}_j = \sum_{k=1}^{V} C1_{k,j}, \quad \bar{C2}_j = \sum_{k=1}^{V} C2_{k,j}
+\end{equation}
+
+给定私钥 $sk$，解密结果点为：
+\begin{equation}
+R_j = \bar{C2}_j - sk \cdot \bar{C1}_j
+\end{equation}
+
+每个 $R_j$ 都是形如 $R_j = n_j \cdot G$ 的曲线点，其中 $n_j$ 为候选人 $j$ 的整数票数。整数 $n_j$ 通过链下有界离散对数求解（baby-step giant-step）恢复，再作为计票整数提交至合约。
+
+计票电路证明以下性质：
+\begin{itemize}
+    \item 密钥归属一致性：$\mathit{PK} = sk \cdot G$；
+    \item 各候选项解密正确性；
+    \item 结果点总和与总票数一致性。
+\end{itemize}
+此外，合约在接受 ZKP3 前会校验提交的 $\mathit{totalVotes}$ 与链上内部计数器 \texttt{totalVotes} 一致，从而桥接电路层约束与账本状态。
+在当前原型中，ZKP3 绑定的是结果\emph{曲线点}的正确性。合约会将这些结果点写入链上状态并通过事件发布，便于审计者核对“公开整数结果”与“点形式计票证据”是否一致；但逐候选人的“整数到曲线点”绑定尚未由合约约束强制。
+
+\section{Merkle 审计构建}
+
+审计集合直接使用承诺值作为叶子：
+\begin{equation}
+\mathit{leaf}_i = \mathit{commitment}_i
+\end{equation}
+
+内部节点通过有序子节点对的 Keccak 哈希构造：
+\begin{equation}
+\mathit{node} = \mathsf{keccak256}(\mathit{left} \parallel \mathit{right})
+\end{equation}
+
+叶子值沿用投票电路已生成的 Poseidon 承诺，内部节点采用 Keccak256 以兼容 EVM 原生审计工具。
+若某层节点数为奇数，复制最后一个节点。构树前按
+\texttt{blockNumber}、\texttt{transactionIndex} 与 \texttt{logIndex} 对承诺排序；只要各实现采用相同排序规则，即可得到确定性根值。
+计票定稿后，合约拒绝更新 \texttt{merkleRoot}，从而将审计摘要固化为不可变状态。
+
+\section{匿名验证流程}
+
+选民本地回执保存字段包括：候选人 ID、盐值、承诺、交易哈希与选举 ID。
+验证流程如下：
+\begin{enumerate}
+    \item 由候选人 ID 与盐值重算承诺；
+    \item 在审计包中定位同时匹配承诺与交易哈希的条目；
+    \item 验证该条目到根的 Merkle 路径；
+    \item 当且仅当证明有效、审计包根与链上 \texttt{merkleRoot} 一致、且选举元数据匹配时判定通过。
+\end{enumerate}
+
+该流程允许选民在验证环节不依赖地址检索实现个体包含性核验。链上公开事件中的“地址到承诺”关联关系仍可见，不在该验证抽象的保护范围内。
+
+表 \ref{tab:audit-artifacts} 列出匿名验证所依赖的主要工件。
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{审计工件及其作用}
+\label{tab:audit-artifacts}
+\begin{tabular}{L{3.2cm} L{3.8cm} L{5.8cm}}
+\toprule
+工件 & 来源 & 验证作用 \\
+\midrule
+回执 JSON & 选民本地存储 & 提供候选人 ID、盐值与承诺，用于重算承诺一致性。 \\
+承诺叶子 & 链上投票事件 & 作为 Merkle 构建中的单个选票承诺项。 \\
+证明路径 & 审计包条目 & 提供对数规模包含性证明，验证至审计包根。 \\
+Merkle 根 & 计票发布 / 审计包元数据 & 作为承诺集合摘要，决定包含性验证结果。 \\
+选举 ID & 审计包与回执元数据 & 防止跨选举重放或误用不匹配审计包。 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{复杂度与可扩展性考虑}
+
+对于 $V$ 张选票与 $N$ 名候选人：
+\begin{itemize}
+    \item 单选民选票加密复杂度为 $O(N)$；
+    \item 投票证明生成是主要单选民时延瓶颈（当前电路规模测得约 3--8 秒），该代价不包含在 $O(N)$ 加密项中；
+    \item 计票聚合复杂度为 $O(VN)$ 次点加法；
+    \item 单次包含性证明验证复杂度为 $O(\log V)$ 次哈希运算。
+\end{itemize}
+
+当前实现适用于原型场景下的小到中等规模选举。更大规模部署需进一步优化证明生成时延、事件索引能力与密钥治理机制。
+
+\section{本章小结}
+
+本章形式化定义了协议模型，阐明威胁假设，并给出从选票编码到匿名审计验证的密码学工作流。同时，本章确立了确定性 Merkle 构建规则与复杂度边界，为第 4 章实现决策提供依据。若本章回答的是协议“做什么”，第 4 章将回答各组件“如何在代码中实现”。
+
+\endgroup
+
+
