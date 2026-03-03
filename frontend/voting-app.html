@@ -705,6 +705,7 @@
             "function castVote(bytes32, bytes32, uint256[2], uint256[2][2], uint256[2], uint256[])",
             "function getVoteRecord(address) view returns (bytes32, bytes32, uint256, bool)",
             "function getElgamalPK() view returns (uint256[2])",
+            "function merkleRoot() view returns (bytes32)",
             "function getAllCandidates() view returns (tuple(uint256 id, string name, uint256 voteCount)[])",
             "function isRegistered(address) view returns (bool)",
             "function hasVoted(address) view returns (bool)"
@@ -818,7 +819,7 @@
             }
         }
 
-        function verifyMyVote() {
+        async function verifyMyVote() {
             try {
                 if (!elgamal) throw new Error('ZKP 库尚未初始化');
                 if (!loadedReceipt) throw new Error('请先点击「加载本地凭证」');
@@ -826,6 +827,7 @@
 
                 const receipt = loadedReceipt;
                 const bundle = loadedAuditBundle;
+                if (!votingContract) throw new Error('Please connect wallet before verification');
 
                 if (receipt.electionId && bundle.electionId && receipt.electionId !== bundle.electionId) {
                     throw new Error('凭证与审计包的选举 ID 不匹配');
@@ -839,6 +841,12 @@
                 const receiptHex = toCommitmentHex(receipt.commitment);
                 if (computedHex !== receiptHex) {
                     throw new Error('凭证中的 commitment 与 candidateId+salt 不匹配');
+                }
+
+                const bundleRoot = AuditLib.normalizeBytes32(bundle.root);
+                const onChainRoot = AuditLib.normalizeBytes32(await votingContract.merkleRoot());
+                if (bundleRoot !== onChainRoot) {
+                    throw new Error('Audit bundle root mismatch with on-chain merkleRoot');
                 }
 
                 const matches = AuditLib.findEntriesByCommitment(bundle, receiptHex);

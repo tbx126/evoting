@@ -635,6 +635,7 @@
             "function updateTallyResults(uint256[], bytes32, uint256[2], uint256[2][2], uint256[2], uint256[15])",
             "function admin() view returns (address)",
             "function getElgamalPK() view returns (uint256[2])",
+            "function getVoteRecord(address) view returns (bytes32, bytes32, uint256, bool)",
             "function registerVoter(address)",
             "function registerVotersBatch(address[])",
             "function isRegistered(address) view returns (bool)",
@@ -1006,16 +1007,52 @@
                     setStepDetail(1, '未找到任何投票事件');
                     return;
                 }
-                tallyState.events = events;
-                tallyState.numVotes = events.length;
-                events.forEach((ev, i) => {
+                const slotCount = Number(candidates.length);
+                const expectedLen = slotCount * 4;
+                const validatedEvents = [];
+                let droppedEvents = 0;
+                for (const ev of events) {
+                    try {
+                        const voter = ev.args.voter;
+                        const eventCommitment = AuditLib.normalizeBytes32(ev.args.commitment);
+                        const encRaw = ev.args.encryptedVote.map((x) => BigInt(x.toString()));
+                        if (encRaw.length !== expectedLen) {
+                            droppedEvents++;
+                            continue;
+                        }
+                        const cts = elgamal.uint256ArrayToCiphertexts(encRaw, slotCount);
+                        const computedHash = elgamal.computeCiphertextHash(cts);
+                        const computedHashHex = AuditLib.normalizeBytes32(`0x${computedHash.toString(16)}`);
+                        const record = await votingContract.getVoteRecord(voter);
+                        const chainCommitment = AuditLib.normalizeBytes32(record[0]);
+                        const chainCiphertextHash = AuditLib.normalizeBytes32(record[1]);
+                        if (eventCommitment !== chainCommitment || computedHashHex !== chainCiphertextHash) {
+                            droppedEvents++;
+                            continue;
+                        }
+                        validatedEvents.push(ev);
+                    } catch (verifyErr) {
+                        droppedEvents++;
+                    }
+                }
+                if (validatedEvents.length === 0) {
+                    setStepState(1, 'error');
+                    setStepDetail(1, 'No valid encrypted vote events after integrity checks');
+                    addLog('[Step 1] no valid events after commitment/ciphertext verification', 'error');
+                    return;
+                }
+                tallyState.events = validatedEvents;
+                tallyState.numVotes = validatedEvents.length;
+                validatedEvents.forEach((ev, i) => {
                     addLogHtml(`  #${i}: 区块 ${ev.blockNumber} | ${txHashLink(ev.transactionHash)}`, 'info');
                 });
                 const ms = fmtMs(performance.now() - t0);
                 setStepDetail(1, `找到 <span class="mono-data">${events.length}</span> 张选票 (${ms})`);
                 setStepState(1, 'complete');
+                setStepDetail(1, `Validated <span class="mono-data">${validatedEvents.length}</span> votes, dropped ${droppedEvents} (${ms})`);
                 tallyState.currentStep = 1;
                 enableStep(2);
+                addLog(`[Step 1] integrity filter dropped ${droppedEvents} events`, 'info');
                 addLog(`[Step 1] 完成: ${events.length} 张选票, 耗时 ${ms}`, 'success');
             } catch (e) {
                 setStepState(1, 'error');

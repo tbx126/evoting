@@ -66,6 +66,8 @@ contract Voting {
 
     /// @notice 总投票数
     uint256 public totalVotes;
+    uint256 public constant CIRCUIT_CANDIDATE_COUNT = 2;
+    uint256 public constant ENCRYPTED_SLOT_WIDTH = 4;
 
     /// @notice 已注册选民总数
     uint256 public totalVoters;
@@ -111,6 +113,8 @@ contract Voting {
 
     /// @notice 所有投票承诺数组
     bytes32[] public commitments;
+    uint256[2] public tallyResultPointX;
+    uint256[2] public tallyResultPointY;
 
     // ============ 事件 ============
 
@@ -120,6 +124,7 @@ contract Voting {
     event VoteCast(address indexed voter, bytes32 commitment, bytes32 ciphertextHash);
     event EncryptedVoteCast(address indexed voter, bytes32 commitment, uint256[] encryptedVote);
     event TallyCompleted(uint256[] results, bytes32 merkleRoot);
+    event TallyResultPoints(uint256[2] resultPointX, uint256[2] resultPointY);
     event ElectionStatusChanged(ElectionStatus newStatus);
     event MerkleRootUpdated(bytes32 root);
 
@@ -216,6 +221,7 @@ contract Voting {
      * @param _name 候选人名称
      */
     function addCandidate(string calldata _name) external onlyAdmin inStatus(ElectionStatus.Created) {
+        require(candidateCount < CIRCUIT_CANDIDATE_COUNT, "Voting: circuit supports 2 candidates");
         uint256 candidateId = candidateCount++;
         candidates[candidateId] = Candidate({
             id: candidateId,
@@ -243,7 +249,7 @@ contract Voting {
      * @notice 启动选举（管理员手动开启）
      */
     function startElection() external onlyAdmin inStatus(ElectionStatus.Created) {
-        require(candidateCount >= 2, "Voting: need at least 2 candidates");
+        require(candidateCount == CIRCUIT_CANDIDATE_COUNT, "Voting: candidate-circuit mismatch");
         status = ElectionStatus.Active;
         emit ElectionStatusChanged(ElectionStatus.Active);
     }
@@ -275,11 +281,17 @@ contract Voting {
         uint[2] calldata _pC,
         uint256[] calldata _encryptedVote
     ) external electionActive {
+        require(candidateCount == CIRCUIT_CANDIDATE_COUNT, "Voting: candidate-circuit mismatch");
         // 1. 检查选民资格
         require(voters[msg.sender].isRegistered, "Voting: not registered");
         require(!voters[msg.sender].hasVoted, "Voting: already voted");
         require(_commitment != bytes32(0), "Voting: invalid commitment");
+        require(_ciphertextHash != bytes32(0), "Voting: invalid ciphertext hash");
         require(voteRecords[msg.sender].commitment == bytes32(0), "Voting: duplicate vote");
+        require(
+            _encryptedVote.length == CIRCUIT_CANDIDATE_COUNT * ENCRYPTED_SLOT_WIDTH,
+            "Voting: invalid encrypted vote length"
+        );
 
         // 2. 验证 ZKP 证明 (ZKP1 + ZKP2)
         uint[4] memory pubSignals;
@@ -329,6 +341,7 @@ contract Voting {
         uint[2] calldata _pC,
         uint[15] calldata _tallyPubSignals
     ) external onlyAdmin inStatus(ElectionStatus.Ended) {
+        require(candidateCount == CIRCUIT_CANDIDATE_COUNT, "Voting: candidate-circuit mismatch");
         require(_results.length == candidateCount, "Voting: invalid results length");
 
         // 1. 验证公开输入中的 PK 与合约存储的一致 (先于证明验证, 节省 gas)
@@ -347,6 +360,7 @@ contract Voting {
         // 4. 更新候选人得票数
         uint256 totalVotesSum = 0;
         for (uint256 i = 0; i < candidateCount; i++) {
+            require(_results[i] <= totalVotes, "Voting: invalid per-candidate result");
             candidates[i].voteCount = _results[i];
             totalVotesSum += _results[i];
         }
@@ -356,8 +370,13 @@ contract Voting {
         // 5. 更新状态
         merkleRoot = _merkleRoot;
         status = ElectionStatus.Tallied;
+        tallyResultPointX[0] = _tallyPubSignals[10];
+        tallyResultPointX[1] = _tallyPubSignals[11];
+        tallyResultPointY[0] = _tallyPubSignals[12];
+        tallyResultPointY[1] = _tallyPubSignals[13];
 
         emit TallyCompleted(_results, _merkleRoot);
+        emit TallyResultPoints(tallyResultPointX, tallyResultPointY);
         emit ElectionStatusChanged(ElectionStatus.Tallied);
     }
 
@@ -366,6 +385,7 @@ contract Voting {
      * @param _root Merkle 根哈希
      */
     function updateMerkleRoot(bytes32 _root) external onlyAdmin {
+        require(status != ElectionStatus.Tallied, "Voting: merkle root finalized");
         merkleRoot = _root;
         emit MerkleRootUpdated(_root);
     }

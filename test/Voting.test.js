@@ -323,7 +323,7 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
           await voteVerifier.getAddress(), await tallyVerifier.getAddress(), adminPkStr
         );
         await newVoting.addCandidate("Only One");
-        await expect(newVoting.startElection()).to.be.revertedWith("Voting: need at least 2 candidates");
+        await expect(newVoting.startElection()).to.be.revertedWith("Voting: candidate-circuit mismatch");
       });
 
       it("管理员应该能启动选举", async function () {
@@ -429,6 +429,20 @@ describe("区块链电子投票系统 (ZKP 版本)", function () {
         expect(alice.voteCount).to.equal(2);
         const bob = await voting.getCandidate(1);
         expect(bob.voteCount).to.equal(1);
+      });
+
+      it("prevents merkleRoot overwrite after tally finalization", async function () {
+        const merkleRoot = ethers.keccak256(ethers.toUtf8Bytes("merkle"));
+        await voting.updateTallyResults(
+          tallyData.results, merkleRoot,
+          tallyData.proofA, tallyData.proofB, tallyData.proofC,
+          tallyData.pubSignals
+        );
+
+        const newRoot = ethers.keccak256(ethers.toUtf8Bytes("override"));
+        await expect(
+          voting.updateMerkleRoot(newRoot)
+        ).to.be.revertedWith("Voting: merkle root finalized");
       });
 
       it("计票结果总数必须匹配投票数", async function () {
