@@ -5,12 +5,13 @@
 \begin{tabular}{ll}
 $N$ & Number of candidates \\
 $V$ & Number of cast votes \\
-$v$ & Chosen candidate index \\
-$s$ & Random salt used in commitment \\
-$Com$ & Ballot commitment, $Poseidon(v,s)$ \\
+$\mathit{candidateId}$ & Chosen candidate index \\
+$\mathit{salt}$ & Random salt used in commitment \\
+$\mathit{commitment}$ & Ballot commitment, $\mathsf{Poseidon}(\mathit{candidateId},\mathit{salt})$ \\
 $H_{ct}$ & Ciphertext binding hash \\
-$pk$ & ElGamal public key \\
-$sk$ & ElGamal secret key \\
+$\mathit{PK}$ & ElGamal public key \\
+$\mathit{sk}$ & ElGamal secret key \\
+$G$ & BabyJubJub subgroup generator \\
 $C1, C2$ & ElGamal ciphertext points \\
-$R$ & Merkle root of all commitments \\
+$\mathit{merkleRoot}$ & Merkle root of all commitments \\
 \end{tabular}

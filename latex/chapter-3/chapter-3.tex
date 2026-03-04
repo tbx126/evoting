@@ -43,7 +43,7 @@ Attacker & Attack method & Target property & Control mechanism & Residual risk \
 Malicious voter & Submit non-one-hot or out-of-range encoding & Tally integrity & ZKP1/2 + contract range checks & Compromised client runtime can still submit seemingly valid inputs \\
 Malicious voter & Replay/duplicate voting & One-person-one-vote & Registry whitelist + hasVoted gate & Credential theft/abuse is outside this model \\
 Semi-trusted administrator & Infer individual ballot content & Ballot secrecy & ElGamal encryption + aggregate-only decryption + ZKP3 & Single-key custody remains a trust assumption \\
-Adversarial administrator & Refuse tally or submit inconsistent off-chain artifacts & Availability/auditability & On-chain state machine + proof gates & Denial-of-service and off-chain artifact inconsistency not fully eliminated \\
+Adversarial administrator & Refuse tally or submit inconsistent off-chain artifacts & Availability and auditability & On-chain state machine + proof gates & Denial-of-service and off-chain artifact inconsistency not fully eliminated \\
 Adversarial administrator & Alter per-candidate integer distribution (same total) & Per-candidate tally authenticity & Client-side point-to-integer recheck & Contract layer does not strongly bind integers to result points (C1 gap) \\
 \bottomrule
 \end{tabular}
@@ -70,7 +70,7 @@ Table \ref{tab:state-transition-guards} makes the transition guards explicit at 
 \small
 \caption{State Transition Guards and Rejection Rules}
 \label{tab:state-transition-guards}
-\begin{tabular}{L{2.8cm} L{1.8cm} L{6.2cm}}
+\begin{tabular}{L{2.8cm} L{2.2cm} L{5.8cm}}
 \toprule
 Transition & Actor & Guard and rejection behavior \\
 \midrule
@@ -145,13 +145,13 @@ For each candidate position $j$, ElGamal ciphertext is generated on BabyJubJub:
 \begin{equation}
 C1_j = r_j \cdot G, \quad C2_j = m_j \cdot G + r_j \cdot \mathit{PK}
 \end{equation}
-where $r_j$ is sampled uniformly from the BabyJubJub scalar field, $G$ is generator, and $\mathit{PK}$ is administrator public key. The notation is general in $N$, while the current deployed prototype instantiates $N=2$ and enforces this cardinality at contract layer.
+where $r_j$ is sampled uniformly from the BabyJubJub scalar field, $G$ is generator, and $\mathit{PK}$ is administrator public key. We write $C1_j=(\mathit{c1X}_j,\mathit{c1Y}_j)$ and $C2_j=(\mathit{c2X}_j,\mathit{c2Y}_j)$ for affine coordinates, which are used by the vote-proof witness and ciphertext binding hash. The notation is general in $N$, while the current deployed prototype instantiates $N=2$ and enforces this cardinality at contract layer.
 
 \section{Commitment and Ciphertext Binding}
 
-For random salt $s$, commitment is defined as:
+For private random salt $\mathit{salt}$, commitment is defined as:
 \begin{equation}
-\mathit{Com} = \mathsf{Poseidon}(\mathit{candidateId},\, s)
+\mathit{commitment} = \mathsf{Poseidon}(\mathit{candidateId},\, \mathit{salt})
 \end{equation}
 
 Ciphertext binding hash is defined over all ciphertext coordinates:
@@ -162,7 +162,7 @@ H_{ct} = \mathsf{Poseidon}(&\mathit{c1X}_0,\,\mathit{c1Y}_0,\,\mathit{c2X}_0,\,\
 \end{split}
 \end{equation}
 
-The vote proof uses $(\mathit{Com}, H_{ct}, PK_x, PK_y)$ as public signals and proves consistency between commitment, candidate index, and encrypted one-hot structure.
+The vote proof uses $(\mathit{commitment}, H_{ct}, PK_x, PK_y)$ as public signals and proves consistency between commitment, candidate index, and encrypted one-hot structure.
 Here, $PK_x, PK_y$ denote affine coordinates of $\mathit{PK}$.
 In the reference tally client, each emitted ciphertext payload is re-hashed off-chain and matched against the on-chain vote record $(\mathit{commitment}, \mathit{ciphertextHash})$ before aggregation; mismatched entries are excluded from the tally set. This is a client-side integrity requirement rather than a contract-enforced invariant.
 
@@ -184,17 +184,18 @@ For each candidate position $j$, aggregated ciphertext is computed by point addi
 \begin{equation}
 \bar{C1}_j = \sum_{k=1}^{V} C1_{k,j}, \quad \bar{C2}_j = \sum_{k=1}^{V} C2_{k,j}
 \end{equation}
+For tally-proof public signals, we write $\bar{C1}_j=(\bar{C1}^{X}_j,\bar{C1}^{Y}_j)$ and $\bar{C2}_j=(\bar{C2}^{X}_j,\bar{C2}^{Y}_j)$ in affine form.
 
-Given secret key $sk$, decryption result point is:
+Given secret key $\mathit{sk}$, decryption result point is:
 \begin{equation}
-R_j = \bar{C2}_j - sk \cdot \bar{C1}_j
+R_j = \bar{C2}_j - \mathit{sk} \cdot \bar{C1}_j
 \end{equation}
 
 Each $R_j$ is a curve point of the form $R_j = n_j \cdot G$, where $n_j$ is the integer vote count for candidate $j$. The integer $n_j$ is recovered off-chain by bounded discrete-log solving (baby-step giant-step) and then submitted to the contract as tally integers.
 
 The tally circuit proves:
 \begin{itemize}
-    \item key ownership consistency: $\mathit{PK} = sk \cdot G$;
+    \item key ownership consistency: $\mathit{PK} = \mathit{sk} \cdot G$;
     \item decryption correctness per candidate;
     \item sum consistency of all result points with total vote count.
 \end{itemize}
@@ -209,9 +210,9 @@ The audit set uses commitment values as leaves directly:
 \mathit{leaf}_i = \mathit{commitment}_i
 \end{equation}
 
-Internal nodes are built using Keccak over ordered child pair:
+Internal nodes are built using Keccak256 over ordered child pair:
 \begin{equation}
-\mathit{node} = \mathsf{keccak256}(\mathit{left} \parallel \mathit{right})
+\mathit{node} = \mathsf{Keccak256}(\mathit{left} \parallel \mathit{right})
 \end{equation}
 
 Leaf values remain Poseidon commitments already produced by the vote circuit, while internal nodes use Keccak256 for EVM-native compatibility in audit tooling.

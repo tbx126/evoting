@@ -215,11 +215,11 @@ The total deployed bytecode across all three contracts is 13{,}829 bytes. The Vo
 
 \subsection{Scalability Discussion}
 
-The system's scalability characteristics vary by component. On-chain gas per vote (\texttt{castVote}) is essentially constant regardless of how many votes have already been cast, because each vote is independently verified and stored. However, two operations scale with election size:
+The system's scalability characteristics vary by component. On-chain gas per vote (\texttt{castVote}) is essentially constant regardless of how many votes have already been cast, because each vote is independently verified and stored. Let $V_{max}$ denote the maximum expected tally per candidate. Several operations scale with election size:
 
 \begin{itemize}
     \item \textbf{Tally aggregation} requires $O(VN)$ elliptic-curve point additions, performed off-chain by the administrator. For $V = 1{,}000$ votes and $N = 2$ candidates, this amounts to 2{,}000 point additions, completing in under one second on modern hardware.
-    \item \textbf{Discrete-log recovery} during tally decryption uses a baby-step giant-step algorithm bounded by the maximum expected vote count per candidate. For tallies up to approximately $2^{20}$ ($\sim$1M votes), this requires $O(\sqrt{V})$ precomputed table entries, which is practical. Beyond this range, the brute-force search becomes a bottleneck.
+    \item \textbf{Discrete-log recovery} during tally decryption uses a baby-step giant-step algorithm bounded by the maximum expected vote count per candidate. For tallies up to approximately $2^{20}$ ($\sim$1M votes), this requires $O(\sqrt{V_{max}})$ precomputed table entries, which is practical. Beyond this range, the brute-force search becomes a bottleneck.
     \item \textbf{Merkle tree construction} is $O(V)$ with $O(\log V)$ verification per inclusion check. For $V = 10{,}000$ commitments, tree construction completes in milliseconds.
     \item \textbf{Circuit constraint scaling}: increasing the number of candidates from $N = 2$ to $N = 10$ would increase vote proof constraints approximately 4.8$\times$ (from $\sim$15k to $\sim$73k), proportionally increasing proof generation time and proving key size.
 \end{itemize}
@@ -240,7 +240,7 @@ Tally aggregation (off-chain) & $O(VN)$ & Practical up to $V = 10^5$ \\
 DLog recovery (off-chain) & $O(\sqrt{V_{max}})$ & Practical up to $V_{max} \approx 2^{20}$ \\
 Merkle tree build (off-chain) & $O(V)$ & Practical up to $V = 10^6$ \\
 Inclusion verification & $O(\log V)$ & Negligible for all practical $V$ \\
-Proof generation (client) & $O(N \cdot C)$ & Scales linearly with candidate count $N$ \\
+Proof generation (client) & $O(C_{vote})$ & Scales with vote-circuit constraints, where $C_{vote}\approx aN+b$ for fixed circuit design \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -249,7 +249,7 @@ Overall, the prototype is well-suited for small-to-medium elections (up to sever
 
 \section{Commitment Merkle Auditability}
 
-The audit design uses commitment leaves directly and derives internal nodes with Keccak. Deterministic event ordering ensures that independent auditors can reconstruct the same root given the same event set.
+The audit design uses commitment leaves directly and derives internal nodes with Keccak256. Deterministic event ordering ensures that independent auditors can reconstruct the same root given the same event set.
 
 \subsection{Audit Bundle Content}
 

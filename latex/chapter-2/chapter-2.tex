@@ -57,7 +57,7 @@ In this project, two instances of this pattern apply:
        &\quad \mathit{c1X}_0,\; \mathit{c1Y}_0,\; \mathit{c2X}_0,\; \mathit{c2Y}_0,\; \dots,\; \mathit{c1X}_{N-1},\; \mathit{c1Y}_{N-1},\; \mathit{c2X}_{N-1},\; \mathit{c2Y}_{N-1})
     \end{align*}
     The relation $\mathcal{R}$ requires that: (i) $\mathit{commitment} = \mathsf{Poseidon}(\mathit{candidateId}, \mathit{salt})$, (ii) $0 \le \mathit{candidateId} < N$, (iii) each ciphertext tuple $(\mathit{c1X}_j,\mathit{c1Y}_j,\mathit{c2X}_j,\mathit{c2Y}_j)$ is a valid ElGamal encryption of one-hot bit $m_j$ where $m_j=1$ iff $j=\mathit{candidateId}$, and (iv) $H_{ct}$ matches the Poseidon hash of all ciphertext coordinates.
-    \item \textbf{Tally proof}: $w = sk$, with public statement
+    \item \textbf{Tally proof}: $w = \mathit{sk}$, with public statement
     \begin{equation*}
         \begin{split}
         x = (&PK_x,\; PK_y,\; \bar{C1}^{X}_0,\; \bar{C1}^{Y}_0,\; \dots,\; \bar{C1}^{X}_{N-1},\; \bar{C1}^{Y}_{N-1},\\
@@ -65,7 +65,7 @@ In this project, two instances of this pattern apply:
              &R^{X}_0,\; R^{Y}_0,\; \dots,\; R^{X}_{N-1},\; R^{Y}_{N-1},\; \mathit{totalVotes})
         \end{split}
     \end{equation*}
-    where $R_j = n_j \cdot G$ is the result point for candidate $j$, $R^{X}_j$, $R^{Y}_j$ are the coordinates of $R_j$, $n_j$ is the corresponding integer vote count, and $\mathit{totalVotes}$ is the expected sum of all candidate totals (corresponding to $V$ in Chapter 1). Here, $PK_x, PK_y$ denote affine coordinates of $\mathit{PK}$.
+    where $R_j = n_j \cdot G$ is the result point for candidate $j$, $R^{X}_j$, $R^{Y}_j$ are the coordinates of $R_j$, $n_j$ is the corresponding integer vote count, and $\mathit{totalVotes}$ is the expected sum of all candidate totals (corresponding to $V$ in Chapter 1). Here, $PK_x, PK_y$ denote affine coordinates of $\mathit{PK}$. Likewise, $\bar{C1}^{X}_j,\bar{C1}^{Y}_j$ and $\bar{C2}^{X}_j,\bar{C2}^{Y}_j$ denote affine coordinates of aggregated points $\bar{C1}_j,\bar{C2}_j$.
 \end{itemize}
 
 \subsection{Formal Security Properties}
@@ -134,14 +134,14 @@ A trusted party samples secrets $(\tau, \alpha, \beta, \gamma, \delta) \overset{
 The secrets $(\tau, \alpha, \beta, \gamma, \delta)$ are then irrecoverably destroyed---these are the ``toxic waste'' of the trusted setup. If any value were leaked, an adversary could forge proofs for false statements without possessing a valid witness. This risk motivates the \emph{Powers of Tau} multi-party computation ceremony, in which many independent participants each contribute fresh randomness and prove they discarded their contribution. The final artifact is secure as long as at least one participant acted honestly.
 
 \paragraph{Prove.}
-Given the full witness $\mathbf{s}$ and the proving key, the prover samples random blinding scalars $r, s' \overset{\$}{\leftarrow} \mathbb{F}_p$ and computes a three-element proof $\pi = (\pi_A, \pi_B, \pi_C)$:
+Given the full witness $\mathbf{s}$ and the proving key, the prover samples random blinding scalars $\rho, \sigma \overset{\$}{\leftarrow} \mathbb{F}_p$ and computes a three-element proof $\pi = (\pi_A, \pi_B, \pi_C)$ (distinct from ElGamal encryption randomness $r_j$):
 \begin{align}
-    \pi_A &= \bigl[\alpha + A(\tau) + r\delta\bigr]_1 \\
-    \pi_B &= \bigl[\beta + B(\tau) + s'\delta\bigr]_2 \\
-    \pi_C &= \left[\frac{C_{\mathit{priv}}(\tau) + H(\tau)T(\tau)}{\delta}\right]_1 + s' \cdot \pi_A \\
-          &\quad + r \cdot \bigl[\beta + B(\tau) + s'\delta\bigr]_1 - rs' \cdot [\delta]_1 \notag
+    \pi_A &= \bigl[\alpha + A(\tau) + \rho\delta\bigr]_1 \\
+    \pi_B &= \bigl[\beta + B(\tau) + \sigma\delta\bigr]_2 \\
+    \pi_C &= \left[\frac{C_{\mathit{priv}}(\tau) + H(\tau)T(\tau)}{\delta}\right]_1 + \sigma \cdot \pi_A \\
+          &\quad + \rho \cdot \bigl[\beta + B(\tau) + \sigma\delta\bigr]_1 - \rho\sigma \cdot [\delta]_1 \notag
 \end{align}
-where $[\cdot]_k$ denotes the elliptic-curve point $(\cdot) \cdot G_k$, and $C_{\mathit{priv}}$ denotes the private-witness portion of the $C$ polynomial. The blinding factors $r$ and $s'$ enforce Groth16's perfect zero-knowledge property: a simulator can generate proofs with the same distribution as real proofs without knowing the witness.
+where $[\cdot]_k$ denotes the elliptic-curve point $(\cdot) \cdot G_k$, and $C_{\mathit{priv}}$ denotes the private-witness portion of the $C$ polynomial. The blinding factors $\rho$ and $\sigma$ enforce Groth16's perfect zero-knowledge property: a simulator can generate proofs with the same distribution as real proofs without knowing the witness.
 
 \paragraph{Verify.}
 The verifier checks one bilinear pairing equation combining proof elements with verification-key elements:
@@ -176,14 +176,14 @@ Three distinct proof instances are deployed, organized into two circuit files:
 \begin{enumerate}
     \item \textbf{ZKP1 (commitment correctness)}: proves $\mathit{commitment} = \mathsf{Poseidon}(\mathit{candidateId}, \mathit{salt})$ without revealing $\mathit{candidateId}$ or $\mathit{salt}$.
     \item \textbf{ZKP2 (one-hot validity)}: proves that the submitted ElGamal ciphertexts encrypt precisely the one-hot vector $\mathbf{m}$ consistent with the committed candidate, without revealing $\mathbf{m}$ or the per-component randomness. Because ZKP1 and ZKP2 share witness variables (both depend on $\mathit{candidateId}$), they are compiled into a single \texttt{vote\_proof} circuit. A single proof simultaneously establishes both properties.
-    \item \textbf{ZKP3 (tally decryption correctness)}: proves that for each candidate $j$, the published result point $R_j = n_j \cdot G$ equals the point obtained by decrypting the aggregated ciphertext under $sk$, and that $sk$ is consistent with the public key $PK = sk \cdot G$. The integer vote counts are derived off-chain from these curve points via discrete-log recovery, and are submitted to the contract separately; the circuit proves the correctness of the curve-point representations, not the integer values directly. This circuit is necessarily separate because it operates over the aggregated ciphertext state, which is only defined after all votes have been collected.
+    \item \textbf{ZKP3 (tally decryption correctness)}: proves that for each candidate $j$, the published result point $R_j = n_j \cdot G$ equals the point obtained by decrypting the aggregated ciphertext under $\mathit{sk}$, and that $\mathit{sk}$ is consistent with the public key $\mathit{PK} = \mathit{sk} \cdot G$. The integer vote counts are derived off-chain from these curve points via discrete-log recovery, and are submitted to the contract separately; the circuit proves the correctness of the curve-point representations, not the integer values directly. This circuit is necessarily separate because it operates over the aggregated ciphertext state, which is only defined after all votes have been collected.
 \end{enumerate}
 
 The on-chain verifier contracts (\texttt{VoteVerifier.sol}, \texttt{TallyVerifier.sol}), generated automatically by snarkjs, each implement the pairing-check equation as a pure Solidity function. The main \texttt{Voting} contract calls these verifiers as a mandatory precondition for \texttt{castVote} and \texttt{updateTallyResults} respectively, enforcing the encoded circuit relations before state updates. Chapter 5 discusses remaining binding gaps that still require hardening for production assurance.
 
 \section{Commitments, Hashing, and Merkle Auditability}
 
-In this design, a commitment acts as a binding receipt for hidden ballot data. The voter computes a hash from candidate ID and salt, then publishes only the digest. Later edits to either secret value would change that digest, so the original claim cannot be silently rewritten. Because the salt $s$ is sampled uniformly at random and kept private, the commitment is also hiding: the digest alone reveals no information about $\mathit{candidateId}$.
+In this design, a commitment acts as a binding receipt for hidden ballot data. The voter computes a hash from candidate ID and salt, then publishes only the digest. Later edits to either secret value would change that digest, so the original claim cannot be silently rewritten. Because $\mathit{salt}$ is sampled uniformly at random and kept private, the commitment is also hiding: the digest alone reveals no information about $\mathit{candidateId}$.
 
 Poseidon is used for this commitment step because it maps efficiently to arithmetic constraints in zk circuits \cite{poseidon2019}. That choice matters in practice: the same hash must be checked inside proof generation, so an expensive circuit hash directly increases proving overhead.
 
