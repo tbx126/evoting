@@ -11,7 +11,7 @@
 
 The repository is organized into five major modules:
 \begin{itemize}
-    \item \texttt{contracts/}: Solidity contracts for election control, voter registry, and verifier adapters.
+    \item \texttt{contracts/}: Solidity contracts for election control (including integrated voter registration) and verifier adapters.
     \item \texttt{circuits/}: Circom circuits for vote and tally proofs.
     \item \texttt{frontend/}: voter and administrator web clients, including browser-side cryptographic helpers.
     \item \texttt{crypto/}: Python cryptographic implementation for BabyJubJub ElGamal and tally utilities.
@@ -25,19 +25,22 @@ Figure \ref{fig:system-architecture} illustrates the implementation layering and
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[x=1cm,y=1cm]
-    \node[draw, rounded corners, minimum width=11.8cm, minimum height=1.2cm, fill=gray!8] (ui) at (0,0) {Frontend Layer: voter page, admin page, wallet interaction};
-    \node[draw, rounded corners, minimum width=11.8cm, minimum height=1.2cm, fill=gray!14] (crypto) at (0,-1.9) {Client Crypto Layer: ElGamal helpers, witness builder, Merkle audit library};
-    \node[draw, rounded corners, minimum width=11.8cm, minimum height=1.2cm, fill=gray!20] (chain) at (0,-3.8) {On-chain Layer: Voting (with voter registration), VoteVerifier, TallyVerifier};
-    \node[draw, rounded corners, minimum width=11.8cm, minimum height=1.2cm, fill=gray!26] (offchain) at (0,-5.7) {Off-chain Validation Layer: Hardhat tests, Python crypto tests};
+    \node[draw, rounded corners=3pt, line width=0.4pt, text width=11.2cm, minimum height=1.2cm, align=center, inner xsep=7pt, fill=gray!8] (ui) at (0,0) {Frontend Layer: voter page, admin page, wallet interaction};
+    \node[draw, rounded corners=3pt, line width=0.4pt, text width=11.2cm, minimum height=1.2cm, align=center, inner xsep=7pt, fill=gray!14] (crypto) at (0,-1.95) {Client Crypto Layer: ElGamal helpers, witness builder, Merkle audit library};
+    \node[draw, rounded corners=3pt, line width=0.4pt, text width=11.2cm, minimum height=1.2cm, align=center, inner xsep=7pt, fill=gray!20] (chain) at (0,-3.9) {On-chain Layer: Voting (with voter registration), VoteVerifier, TallyVerifier};
+    \node[draw, rounded corners=3pt, line width=0.4pt, text width=11.2cm, minimum height=1.2cm, align=center, inner xsep=7pt, fill=gray!26] (offchain) at (0,-5.85) {Off-chain Validation Layer: Hardhat tests, Python crypto tests};
 
     \draw[->, thick] (ui) -- (crypto);
     \draw[->, thick] (crypto) -- (chain);
-    \draw[->, thick] (chain) -- (offchain);
-    \draw[->, thick] (offchain.east) .. controls +(0.8,0.2) and +(0.8,-0.2) .. (ui.east);
+    \draw[->, thick] (chain.south east) .. controls +(1.00,-0.55) and +(1.00,0.55) .. (offchain.north east);
+    \draw[->, thick] (offchain.north west) .. controls +(-1.00,0.55) and +(-1.00,-0.55) .. (chain.south west);
+    \draw[->, thick, dashed] (offchain.east) .. controls +(0.85,0.45) and +(0.85,-0.45) .. (ui.east);
 \end{tikzpicture}
-\caption{Implementation Architecture and Verification Loop}
+\caption{Implementation Layers and Verification Flows}
 \label{fig:system-architecture}
 \end{figure}
+
+\noindent In Figure \ref{fig:system-architecture}, solid arrows represent interaction paths: runtime submission flows (Frontend $\rightarrow$ Crypto $\rightarrow$ Chain), and test-time validation exchange (Chain $\leftrightarrow$ Off-chain Validation). The dashed return path denotes a development feedback loop rather than an on-chain protocol message.
 
 \section{Smart Contract Design}
 
@@ -56,11 +59,11 @@ Voter registration and one-vote enforcement are handled directly within the Voti
 
 \subsection{On-Chain Data Model}
 
-Key on-chain structures include candidate records, per-voter vote metadata (commitment and ciphertext hash), and global commitment array. Ciphertext payload itself is emitted as event data to reduce storage cost while preserving off-chain reconstructability.
+Key on-chain structures include candidate records, per-voter vote metadata (commitment and ciphertext hash), a global commitment array, and persisted point-form tally outputs (\texttt{tallyResultPointX}/\texttt{tallyResultPointY}). Ciphertext payload itself is emitted as event data to reduce storage cost while preserving off-chain reconstructability.
 
 \subsection{Lifecycle Safeguards}
 
-Contract modifiers enforce role and state restrictions. Invalid phase transitions, unauthorized calls, duplicate votes, and malformed proof submissions are rejected before state mutation.
+Contract modifiers enforce role and state restrictions. Invalid phase transitions, unauthorized calls, duplicate votes, and malformed proof submissions are rejected before state mutation. One deliberate exception is \texttt{updateMerkleRoot}: it remains admin-callable until status \texttt{Tallied}. This governance tradeoff and its assurance impact are discussed in Section 5.8 (P2: Merkle root mutability).
 
 Table \ref{tab:module-responsibility} summarizes how major modules split responsibilities.
 
@@ -86,11 +89,11 @@ Admin frontend & Encrypted vote events + admin key & Aggregate/decrypt tally, ge
 
 \subsection{Vote Circuit}
 
-The vote circuit integrates Poseidon commitment checks, candidate range checks, one-hot encryption consistency checks, and ciphertext-hash binding. It is compiled with a fixed candidate cardinality parameter in current project configuration.
+The vote circuit integrates Poseidon commitment checks, candidate range checks, one-hot encryption consistency checks, and ciphertext-hash binding. Candidate range enforcement is implemented with \texttt{LessThan(8)}, so candidate indices are bounded to at most 255. In this repository, the instantiated configuration is fixed to \texttt{N=2}.
 
 \subsection{Tally Circuit}
 
-The tally circuit verifies key ownership relation, decryption correctness for aggregated ciphertexts, and sum consistency against total votes. Public signals are exported and consumed by the Solidity verifier.
+The tally circuit verifies key ownership relation and per-candidate decryption correctness for aggregated ciphertexts. For total consistency, it enforces equality at the curve-point level: the sum of public result points must equal \texttt{totalVotes} $\cdot G$. This is implemented with \texttt{Num2Bits(32)} for \texttt{totalVotes} encoding, which implies an upper bound of approximately $2^{32}-1$ on directly representable totals in-circuit. Public signals are exported and consumed by the Solidity verifier. Because consistency is point-based, strict integer-to-point binding is not fully enforced by the circuit alone; it would require additional contract-level constraints that remain unimplemented (see Section 5.8 for the corresponding P1 gap analysis).
 
 \subsection{Artifact Pipeline}
 
@@ -115,10 +118,10 @@ The voter page executes the following sequence:
 The administrator page performs:
 \begin{enumerate}
     \item encrypted vote event retrieval;
-    \item ciphertext reconstruction and homomorphic aggregation;
-    \item decryption and candidate result extraction;
-    \item tally proof generation and contract submission;
-    \item deterministic commitment Merkle-tree construction;
+    \item ciphertext reconstruction and integrity filtering by recomputing Poseidon \texttt{ciphertextHash} (mismatched entries are dropped);
+    \item homomorphic aggregation, followed by decryption and candidate result extraction;
+    \item tally proof generation (browser-side WASM in current implementation) and contract submission;
+    \item deterministic commitment Merkle-tree construction after sorting by \texttt{blockNumber}, then \texttt{transactionIndex}, then \texttt{logIndex};
     \item audit-bundle export and local cache.
 \end{enumerate}
 
@@ -128,7 +131,7 @@ The audit utility in \texttt{frontend/lib/audit.js} centralizes:
 \begin{itemize}
     \item bytes32 normalization;
     \item Merkle tree construction with duplicate-last odd handling;
-    \item proof generation and verification;
+    \item Merkle inclusion proof generation and path verification;
     \item election-key namespace generation for local storage isolation.
 \end{itemize}
 
@@ -138,7 +141,7 @@ This separation reduces logic duplication and improves testability.
 
 \subsection{Contract-Level Tests}
 
-Hardhat tests cover role control, lifecycle transitions, valid/invalid voting attempts, and tally submission behavior with Groth16 proofs. End-to-end scenarios include realistic proof generation and verifier invocation.
+Hardhat tests cover role control, lifecycle transitions, valid/invalid voting attempts, and tally submission behavior with Groth16 proofs. End-to-end scenarios include realistic proof generation and verifier invocation. To keep suite runtime stable, expensive Groth16 proofs are generated once in a shared setup hook and then reused across behavior-focused test cases.
 
 \subsection{Cryptographic Unit Tests}
 
@@ -148,11 +151,11 @@ Pytest cases validate curve arithmetic invariants, key generation, encryption/de
 
 The dual test stack provides coverage at both the contract protocol layer and the cryptographic primitive layer, giving high confidence in isolated module correctness. However, integration testing revealed several boundary conditions worth noting for future development.
 
-First, the most brittle integration point is the mapping between circuit public signals and Solidity function parameters. Because snarkjs exports proof calldata in a specific encoding, any mismatch in signal ordering between the circuit definition and the contract's expected \texttt{pubSignals} array causes silent proof rejection rather than a descriptive error. This was addressed by careful alignment during circuit compilation, but requires maintenance discipline whenever circuits are recompiled.
+First, the most brittle integration point is the mapping between circuit public signals and Solidity function parameters. Because snarkjs exports proof calldata in a specific encoding, any mismatch in signal ordering between the circuit definition and the contract's expected \texttt{pubSignals} array causes a generic rejection rather than a descriptive per-signal error. This was addressed by careful alignment during circuit compilation, but requires maintenance discipline whenever circuits are recompiled.
 
-Second, browser-side proof generation is resource-intensive. During development, memory pressure caused WASM crashes on devices with less than 4 GB available RAM. The voter interface should therefore include progress indicators and graceful error messages for proof generation failures.
+Second, browser-side proof generation is resource-intensive. During development, memory pressure was observed on some low-memory devices and caused WASM instability. The voter interface should therefore include progress indicators and graceful error messages for proof generation failures.
 
-Third, the ElGamal tally decryption relies on bounded discrete-log recovery (baby-step giant-step). If an election receives more votes than the precomputed table bound, decryption silently fails. This bound must be documented and enforced during deployment configuration.
+Third, ElGamal tally decryption relies on bounded runtime discrete-log recovery (baby-step giant-step). In the current administrator workflow, the search bound is set dynamically to \texttt{totalVotes + 100}. If recovery falls outside this bound, the client raises an explicit error. Since each per-candidate tally is upper-bounded by \texttt{totalVotes}, this bound also upper-bounds per-candidate recovery in practice. The selected bound should still be documented and reviewed for larger-election deployment profiles.
 
 \section{Deployment Notes}
 
@@ -160,13 +163,14 @@ Local deployment uses a Hardhat node and a Python-served static frontend. The de
 
 For testnet or mainnet deployment, the following additional steps apply:
 \begin{itemize}
+    \item Generate and securely store an ElGamal keypair before deployment. Pass \texttt{PK} into the Voting constructor, and keep \texttt{sk} outside the contract and off persistent storage; load it into the administrator client only at tally time.
     \item Configure \texttt{.env} with the deployer private key and the target network RPC URL before running the deploy script.
     \item Ensure the \texttt{frontend/zk/} directory contains the compiled WASM witness generators and proving key files (\texttt{.zkey}) corresponding to the deployed verifier contracts.
     \item Configure MetaMask in the voter and administrator browsers to point to the correct network (chain ID must match the deployment target).
-    \item The trusted setup artifacts (\texttt{build/pot16\_final.ptau} and circuit-specific \texttt{.zkey} files) must be kept consistent with the deployed verifier contracts. Recompiling circuits without redeploying verifiers will cause all proof submissions to fail.
+    \item The trusted setup lineage (the \texttt{.ptau} used for key generation and circuit-specific \texttt{.zkey} files) must be kept consistent with the deployed verifier contracts. Recompiling circuits without redeploying verifiers will cause all proof submissions to fail.
 \end{itemize}
 
-The dependency on trusted setup artifacts and frontend configuration files is explicitly documented in repository instructions \cite{hardhat,solidity,openzeppelin}.
+These operational dependencies are documented in the repository README and deployment scripts.
 
 \section{Chapter Summary}
 

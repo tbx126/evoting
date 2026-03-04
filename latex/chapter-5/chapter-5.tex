@@ -215,11 +215,11 @@ The total deployed bytecode across all three contracts is 13{,}829 bytes. The Vo
 
 \subsection{Scalability Discussion}
 
-The system's scalability characteristics vary by component. On-chain gas per vote (\texttt{castVote}) is essentially constant regardless of how many votes have already been cast, because each vote is independently verified and stored. Let $V_{max}$ denote the maximum expected tally per candidate. Several operations scale with election size:
+The system's scalability characteristics vary by component. On-chain gas per vote (\texttt{castVote}) is essentially constant regardless of how many votes have already been cast, because each vote is independently verified and stored. Let $B_{dlog}$ denote the discrete-log search bound used by the tally client. In the current implementation, $B_{dlog}=V+100$ where $V$ is total votes cast. Several operations scale with election size:
 
 \begin{itemize}
     \item \textbf{Tally aggregation} requires $O(VN)$ elliptic-curve point additions, performed off-chain by the administrator. For $V = 1{,}000$ votes and $N = 2$ candidates, this amounts to 2{,}000 point additions, completing in under one second on modern hardware.
-    \item \textbf{Discrete-log recovery} during tally decryption uses a baby-step giant-step algorithm bounded by the maximum expected vote count per candidate. For tallies up to approximately $2^{20}$ ($\sim$1M votes), this requires $O(\sqrt{V_{max}})$ precomputed table entries, which is practical. Beyond this range, the brute-force search becomes a bottleneck.
+    \item \textbf{Discrete-log recovery} during tally decryption uses runtime baby-step giant-step with complexity $O(\sqrt{B_{dlog}})$. No persistent global precomputed table is required; instead, a temporary baby-step map of size $O(\sqrt{B_{dlog}})$ is built in memory during tally. Since per-candidate tallies are bounded above by $V$, the current bound $B_{dlog}=V+100$ is sufficient for correctness but may become a client-side bottleneck for very large elections.
     \item \textbf{Merkle tree construction} is $O(V)$ with $O(\log V)$ verification per inclusion check. For $V = 10{,}000$ commitments, tree construction completes in milliseconds.
     \item \textbf{Circuit constraint scaling}: increasing the number of candidates from $N = 2$ to $N = 10$ would increase vote proof constraints approximately 4.8$\times$ (from $\sim$15k to $\sim$73k), proportionally increasing proof generation time and proving key size.
 \end{itemize}
@@ -237,7 +237,7 @@ Component & Complexity & Practical Bound \\
 \midrule
 Per-vote on-chain cost & $O(1)$ & Constant $\sim$330k gas per vote \\
 Tally aggregation (off-chain) & $O(VN)$ & Practical up to $V = 10^5$ \\
-DLog recovery (off-chain) & $O(\sqrt{V_{max}})$ & Practical up to $V_{max} \approx 2^{20}$ \\
+DLog recovery (off-chain) & $O(\sqrt{B_{dlog}})$ & Current admin client uses $B_{dlog}=V+100$ \\
 Merkle tree build (off-chain) & $O(V)$ & Practical up to $V = 10^6$ \\
 Inclusion verification & $O(\log V)$ & Negligible for all practical $V$ \\
 Proof generation (client) & $O(C_{vote})$ & Scales with vote-circuit constraints, where $C_{vote}\approx aN+b$ for fixed circuit design \\
