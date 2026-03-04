@@ -10,15 +10,15 @@
 
 \section{Conclusions}
 
-This dissertation implemented and evaluated a blockchain-based e-voting system in which privacy and verifiability are enforced by cryptographic protocol rather than by institutional trust. The core architecture combines three mechanisms: homomorphic ElGamal encryption on BabyJubJub for ballot confidentiality, Groth16 zero-knowledge proofs for vote legality and tally correctness, and commitment-based Merkle inclusion proofs for anonymous voter-side auditability.
+This dissertation implemented and evaluated a blockchain-based e-voting system in which privacy and verifiability are primarily enforced by cryptographic protocol and on-chain checks, while key custody and client integrity remain explicit operational trust assumptions. The core architecture combines three mechanisms: homomorphic ElGamal encryption on BabyJubJub for ballot confidentiality, Groth16 zero-knowledge proofs for vote legality and tally correctness, and commitment-based Merkle inclusion proofs for anonymous voter-side auditability.
 
 The principal engineering result is that all three mechanisms can be integrated into a coherent, browser-to-chain workflow using mainstream tooling: Circom and snarkjs for circuit development, Hardhat and Solidity for contract deployment, and standard Web3 wallet APIs for voter interaction. Crucially, this integration does not require a trusted middleware layer---vote proof verification occurs entirely on-chain, and tally correctness is publicly attested by the submitted ZKP3 proof.
 
-From a research perspective, the system addresses RQ1 by demonstrating that encrypted one-hot ballots and ZKP-based checks are technically feasible in a browser-to-chain pipeline without trusted middleware. It addresses RQ2 by showing that the combination of on-chain proof verification and receipt-based anonymous auditability provides verifiability that is structurally stronger than centralized log-based auditing: observers do not need to trust the operator's claim of correctness, only the cryptographic assumptions underlying the proof system. For RQ3, the gap analysis in Chapter 5 identifies five specific engineering issues that must be resolved before the prototype can be described as production-ready.
+From a research perspective, the system addresses RQ1 by demonstrating that encrypted one-hot ballots and ZKP-based checks are technically feasible in a browser-to-chain pipeline without trusted middleware. It addresses RQ2 by showing that the combination of on-chain proof verification and receipt-based anonymous auditability provides verifiability that is structurally stronger than centralized log-based auditing: observers do not need to trust the operator's claim of correctness, only the cryptographic assumptions underlying the proof system. For RQ3, the gap analysis in Chapter 5 identifies specific P1/P2 engineering issues that must be resolved before the prototype can be described as production-ready.
 
-The evaluation confirmed 75 automated tests passing---32 Hardhat contract and integration tests and 43 Python cryptographic unit tests---providing a reproducible baseline for future development. Performance measurements show that on-chain costs are dominated by Groth16 verification (approximately 181,000 gas for the pairing check), and that the system is practically viable for small-to-medium elections at current Ethereum gas parameters.
+The evaluation confirmed 76 automated tests passing---33 Hardhat contract and integration tests and 43 Python cryptographic unit tests---providing a reproducible baseline for future development. Performance measurements show that on-chain costs are dominated by Groth16 verification (approximately 181,000 gas for the pairing check), and that the system is practically viable for small-to-medium elections at current Ethereum gas parameters.
 
-Taken together, the implementation represents a functional, testable, and honest research prototype: it achieves its stated privacy and verifiability goals, documents its residual gaps explicitly, and provides a clear engineering path toward higher-assurance deployment.
+Taken together, the implementation represents a functional, testable, and honest research prototype: within the trust and scope boundaries defined in Chapters 1 and 5, it achieves its stated privacy and verifiability objectives, documents residual gaps explicitly, and provides a clear engineering path toward higher-assurance deployment.
 
 \section{Completion Assessment Against Project Statement}
 
@@ -49,11 +49,12 @@ The following roadmap is prioritized for completing remaining tasks:
 \begin{enumerate}
     \item \textbf{Strict binding of tally results}: bind the submitted result vector to the public signals verified by Groth16 to prevent inconsistent reporting.
     \item \textbf{Encrypted payload integrity}: compute and enforce ciphertext hash binding to emitted payloads or redesign tally ingestion to avoid relying on mutable sources.
-    \item \textbf{Root authenticity checks}: compare audit bundle root to on-chain \texttt{merkleRoot} in the voter verification flow.
-    \item \textbf{Candidate-count enforcement}: circuits are hardcoded for two candidates; enforce this constraint at the contract level to prevent mismatched deployments from accepting proofs silently.
+    \item \textbf{Root authenticity hardening}: keep bundle-root versus on-chain \texttt{merkleRoot} checks mandatory and regression-tested across all verification paths.
+    \item \textbf{Candidate/circuit invariant hardening}: maintain and continuously test candidate-count and circuit-version consistency when circuits are regenerated or generalized beyond \texttt{N=2}.
     \item \textbf{Governance hardening}: lifecycle-gate or remove unrestricted Merkle-root overwrite functions.
     \item \textbf{Decentralized key management}: introduce threshold encryption/decryption or multi-party custody to reduce single-admin trust.
     \item \textbf{Coercion resistance research}: explore receipt-freeness mechanisms and stronger threat models.
+    \item \textbf{Formal verification extensions}: add formal specification and machine-checked verification for critical contract invariants and proof-signal wiring.
 \end{enumerate}
 
 Table \ref{tab:roadmap-phases} converts the future-work list into phased engineering milestones.
@@ -68,7 +69,7 @@ Table \ref{tab:roadmap-phases} converts the future-work list into phased enginee
 Phase & Priority Deliverables & Expected Outcome \\
 \midrule
 Near-term & Result-vector/public-signal binding, bundle-root vs on-chain-root check, event payload integrity checks & Close critical correctness gaps and strengthen trust in audit outputs \\
-Mid-term & Candidate-count enforcement at contract level, lifecycle-gated Merkle root governance, deployment hardening & Reduce misuse risk and improve operational robustness \\
+Mid-term & Candidate/circuit invariant hardening, lifecycle-gated Merkle root governance, deployment hardening & Reduce misuse risk and improve operational robustness \\
 Long-term & Threshold key management, coercion-resistance mechanisms, formal verification extensions & Move from prototype assurance toward high-assurance production viability \\
 \bottomrule
 \end{tabular}
