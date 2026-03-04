@@ -340,12 +340,10 @@ Residual risks arise primarily from key custody and client environment. Even wit
 
 \section{Outstanding Engineering Gaps and Their Impact}
 
-Code review identified five gaps that affect full assurance. Gaps are classified by impact: \textbf{P1} (high impact, fix before any public deployment) and \textbf{P2} (medium impact, fix before production use):
+Code review identified three remaining gaps that affect full assurance. Gaps are classified by impact: \textbf{P1} (high impact, fix before any public deployment) and \textbf{P2} (medium impact, fix before production use):
 \begin{itemize}
     \item \textbf{[P1] Result binding gap}: contract verifies tally proof but does not strictly bind the submitted integer result vector to all public signals used by the circuit. This can allow inconsistencies if external checks are not enforced.
     \item \textbf{[P1] Ciphertext event binding gap}: the emitted encrypted payload is not fully bound to on-chain stored ciphertext hash. If an attacker can influence event payload parsing or indexing, off-chain tally can be poisoned.
-    \item \textbf{[P1] Audit root cross-check gap}: voter-side inclusion verification should compare bundle root with on-chain stored root to prevent acceptance of a self-consistent but unauthorized bundle.
-    \item \textbf{[P2] Candidate cardinality mismatch}: circuits are compiled for two candidates while contract permits dynamic candidate count; deploying with more than two candidates will cause proof verification failures.
     \item \textbf{[P2] Merkle root mutability}: a direct root-update function exists without strict lifecycle gating; this increases governance attack surface.
 \end{itemize}
 

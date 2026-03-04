@@ -29,7 +29,7 @@ The model considers malicious voters and passive blockchain observers. For admin
     \item fabricated tally claims unsupported by valid proof.
 \end{itemize}
 
-The following are not fully solved in the current prototype: coercion resistance, malware-compromised browser clients, threshold key governance, fully adversarial administrator behavior (for example refusing to tally or submitting inconsistent off-chain artifacts), and per-candidate integer-to-result-point binding at contract layer (ZKP3 constrains curve-point correctness, while integer mapping remains client-verifiable rather than contract-enforced).
+The following are not fully solved in the current prototype: coercion resistance, malware-compromised browser clients, threshold key governance, fully adversarial administrator behavior (for example refusing to tally or submitting inconsistent off-chain artifacts), and per-candidate integer-to-result-point binding at contract layer (ZKP3 constrains curve-point correctness, while integer mapping remains client-verifiable rather than contract-enforced). Table~\ref{tab:threat-matrix} structures the full attack surface considered by this model.
 
 \begin{table}[htbp]
 \centering
@@ -44,7 +44,7 @@ Malicious voter & Submit non-one-hot or out-of-range encoding & Tally integrity 
 Malicious voter & Replay/duplicate voting & One-person-one-vote & Registry whitelist + hasVoted gate & Credential theft/abuse is outside this model \\
 Semi-trusted administrator & Infer individual ballot content & Ballot secrecy & ElGamal encryption + aggregate-only decryption + ZKP3 & Single-key custody remains a trust assumption \\
 Adversarial administrator & Refuse tally or submit inconsistent off-chain artifacts & Availability and auditability & On-chain state machine + proof gates & Denial-of-service and off-chain artifact inconsistency not fully eliminated \\
-Adversarial administrator & Alter per-candidate integer distribution (same total) & Per-candidate tally authenticity & Client-side point-to-integer recheck & Contract layer does not strongly bind integers to result points (C1 gap) \\
+Adversarial administrator & Alter per-candidate integer distribution (same total) & Per-candidate tally authenticity & Client-side point-to-integer recheck & Contract layer does not strongly bind integers to result points (see Section~5.8, \textbf{[P1]}) \\
 \bottomrule
 \end{tabular}
 \end{table}

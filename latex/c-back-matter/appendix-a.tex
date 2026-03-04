@@ -13,6 +13,7 @@ Key folders used during reproduction:
 \begin{itemize}
     \item \texttt{contracts/}: Solidity contracts.
     \item \texttt{circuits/}: Circom circuits for Groth16 proofs.
+    \item \texttt{scripts/}: deployment scripts (including \texttt{deploy.js}).
     \item \texttt{frontend/}: voter and admin pages.
     \item \texttt{crypto/}: Python ElGamal implementation.
     \item \texttt{test/}: Hardhat integration tests.
@@ -24,6 +25,16 @@ Key folders used during reproduction:
 npm install
 pip install -r requirements.txt
 \end{verbatim}
+
+\section{ZKP Artifact Prerequisites}
+Before running the frontend flow, ensure the following files exist under \texttt{frontend/zk/}:
+\begin{itemize}
+    \item \texttt{vote\_proof.wasm}
+    \item \texttt{vote\_proof\_final.zkey}
+    \item \texttt{tally\_proof.wasm}
+    \item \texttt{tally\_proof\_final.zkey}
+\end{itemize}
+These artifacts are not committed to the repository and must be generated or provisioned separately. They must match the deployed verifier contracts; otherwise proof generation or on-chain verification will fail.
 
 \section{Local Development Run}
 A standard local run uses three terminals:
@@ -53,7 +64,7 @@ python -m pytest tests/ -q
 
 \section{End-to-End Demo Script}
 \begin{enumerate}
-    \item On admin page: add two candidates using the \texttt{addCandidates} function (circuits are compiled for $N=2$).
+    \item On admin page: add two candidates using the \texttt{addCandidates} function (circuits are compiled for $N=2$). \textit{Note: in local development mode, the deploy script pre-adds two candidates. Skip this step and proceed directly to Step 2; manual candidate addition is required for testnet or production deployments.}
     \item Register voter addresses. \textit{Note: in local development mode, the deploy script automatically registers the first five test accounts as voters; manual registration via the admin page is required for testnet or production deployments.}
     \item Start election.
     \item On voter page: connect wallet, select candidate, submit vote. Repeat for multiple voters.
@@ -70,7 +81,7 @@ A successful run produces:
     \item a final tally transaction;
     \item \texttt{audit\_bundle.json} containing Merkle root and proofs;
     \item successful inclusion verification on voter side.
-    \item Note: each on-chain vote record includes a \texttt{counted} field reserved for future use; it remains \texttt{false} in the current implementation.
 \end{itemize}
+\noindent\textbf{Note:} each on-chain vote record includes a \texttt{counted} field reserved for future use; it remains \texttt{false} in the current implementation.
 
 \endgroup
