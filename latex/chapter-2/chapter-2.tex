@@ -32,7 +32,7 @@ Transparency cuts both ways, though. If vote semantics appear in plaintext, conf
 
 \section{Homomorphic Encryption for Private Tally}
 
-ElGamal encryption on elliptic-curve discrete-log groups supports additive homomorphism over encoded messages \cite{elgamal1985,hankerson2004ecc}. This work instantiates ElGamal on BabyJubJub, which is defined over the BN254 scalar field and therefore admits native arithmetic in Groth16 circuits without field-conversion overhead. Each ballot is encoded as a one-hot vector; component-wise aggregation of ciphertexts gives encrypted candidate totals. Decrypting only the aggregates avoids exposing individual ballots.
+ElGamal encryption on elliptic-curve discrete-log groups supports additive homomorphism over encoded messages \cite{elgamal1985,hankerson2004ecc}. This work instantiates ElGamal on BabyJubJub \cite{eip2494}, which is defined over the BN254 scalar field and therefore admits native arithmetic in Groth16 circuits without field-conversion overhead. Each ballot is encoded as a one-hot vector; component-wise aggregation of ciphertexts gives encrypted candidate totals. Decrypting only the aggregates avoids exposing individual ballots.
 
 Two practical advantages follow. Ciphertext aggregation scales linearly with vote count using simple point additions; recovering final integer totals from decrypted points is a separate off-chain discrete-log step. Privacy holds as long as secret-key exposure and plaintext side channels stay controlled---a weaker guarantee than threshold decryption, but achievable without ceremony infrastructure.
 
@@ -131,7 +131,7 @@ A trusted party samples secrets $(\tau, \alpha, \beta, \gamma, \delta) \overset{
     \item \textbf{Verification key} $\mathit{vk}$: contains $[\alpha]_1$, $[\beta]_2$, $[\gamma]_2$, $[\delta]_2$, and $\{[(\beta u_j + \alpha v_j + w_j)(\tau)/\gamma]_1\}$ for the public signal indices.
 \end{itemize}
 
-The secrets $(\tau, \alpha, \beta, \gamma, \delta)$ are then irrecoverably destroyed---these are the ``toxic waste'' of the trusted setup. If any value were leaked, an adversary could forge proofs for false statements without possessing a valid witness. This risk motivates the \emph{Powers of Tau} multi-party computation ceremony, in which many independent participants each contribute fresh randomness and prove they discarded their contribution. The final artifact is secure as long as at least one participant acted honestly.
+The secrets $(\tau, \alpha, \beta, \gamma, \delta)$ are then irrecoverably destroyed---these are the ``toxic waste'' of the trusted setup. If any value were leaked, an adversary could forge proofs for false statements without possessing a valid witness. This risk motivates the \emph{Powers of Tau} multi-party computation ceremony \cite{powersoftau2017}, in which many independent participants each contribute fresh randomness and prove they discarded their contribution. The final artifact is secure as long as at least one participant acted honestly.
 
 \paragraph{Prove.}
 Given the full witness $\mathbf{s}$ and the proving key, the prover samples random blinding scalars $\rho, \sigma \overset{\$}{\leftarrow} \mathbb{F}_p$ and computes a three-element proof $\pi = (\pi_A, \pi_B, \pi_C)$ (distinct from ElGamal encryption randomness $r_j$):
@@ -185,7 +185,7 @@ The on-chain verifier contracts (\texttt{VoteVerifier.sol}, \texttt{TallyVerifie
 
 In this design, a commitment acts as a binding receipt for hidden ballot data. The voter computes a hash from candidate ID and salt, then publishes only the digest. Later edits to either secret value would change that digest, so the original claim cannot be silently rewritten. Because $\mathit{salt}$ is sampled uniformly at random and kept private, the commitment is also hiding: the digest alone reveals no information about $\mathit{candidateId}$.
 
-Poseidon is used for this commitment step because it maps efficiently to arithmetic constraints in zk circuits \cite{poseidon2019}. That choice matters in practice: the same hash must be checked inside proof generation, so an expensive circuit hash directly increases proving overhead.
+Poseidon is used for this commitment step because it maps efficiently to arithmetic constraints in zk circuits \cite{poseidon2021}. That choice matters in practice: the same hash must be checked inside proof generation, so an expensive circuit hash directly increases proving overhead.
 
 Auditability is then lifted from single commitments to the full ballot set through a Merkle tree \cite{merkle1988}. Each leaf stores one commitment, while the root commits to the entire ordered list. Inclusion proofs grow logarithmically with the number of leaves, which keeps verification cost manageable even as participation scales.
 

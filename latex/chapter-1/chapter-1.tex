@@ -27,7 +27,7 @@ Let $V$ be the number of cast ballots and $N$ the number of candidates. Every ac
 
 \section{Motivation}
 
-Several practical developments make this combination of techniques worth pursuing. Blockchain ledgers maintain append-only event logs with deterministic execution, removing one class of attack---silent rewrites of election state---that centralized backends remain vulnerable to \cite{nakamoto2008,wood2014}. Modern zk-SNARK systems have reached the point where proof sizes are small and on-chain verification fits within smart-contract budgets \cite{groth2016}. Circuit-friendly hash functions and Merkle structures add post-election inclusion checks that scale to large ballot sets without expensive on-chain storage \cite{poseidon2019,merkle1988}.
+Several practical developments make this combination of techniques worth pursuing. Blockchain ledgers maintain append-only event logs with deterministic execution, removing one class of attack---silent rewrites of election state---that centralized backends remain vulnerable to \cite{nakamoto2008,wood2014}. Modern zk-SNARK systems have reached the point where proof sizes are small and on-chain verification fits within smart-contract budgets \cite{groth2016}. Circuit-friendly hash functions and Merkle structures add post-election inclusion checks that scale to large ballot sets without expensive on-chain storage \cite{poseidon2021,merkle1988}.
 
 Taken together, these tools open up a design space that reduces the privacy-versus-verifiability tradeoff and shifts assurance away from institutional promises toward cryptographic checks and public execution traces.
 

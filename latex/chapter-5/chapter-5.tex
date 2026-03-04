@@ -162,7 +162,7 @@ For a voter casting a ballot, the browser must load approximately 10.0~MB of pro
 
 Gas costs are central to evaluating blockchain-based protocol feasibility. Groth16 proof verification dominates the on-chain cost due to the \texttt{ecPairing} precompile, which on EVM costs $45{,}000 + 34{,}000 \times k$ gas for $k$ pairing checks (Groth16 uses $k = 4$, yielding 181{,}000 gas for the pairing alone).
 
-Table \ref{tab:gas-costs} reports the estimated gas consumption for each major on-chain operation, broken down by component. These estimates are derived from EVM opcode pricing (EIP-1108 precompile costs, EIP-2929 cold/warm storage access costs) applied to the contract logic in \texttt{Voting.sol}.
+Table \ref{tab:gas-costs} reports the estimated gas consumption for each major on-chain operation, broken down by component. These estimates are derived from EVM opcode pricing (EIP-1108 precompile costs \cite{eip1108}, EIP-2929 cold/warm storage access costs \cite{eip2929}) applied to the contract logic in \texttt{Voting.sol}.
 
 \begin{table}[htbp]
 \centering
@@ -193,7 +193,7 @@ These times are acceptable for a prototype where voters submit one ballot per el
 
 \subsection{Contract Bytecode Size}
 
-Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170). Table \ref{tab:bytecode-sizes} confirms that all contracts remain well within this limit.
+Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170 \cite{eip170}). Table \ref{tab:bytecode-sizes} confirms that all contracts remain well within this limit.
 
 \begin{table}[htbp]
 \centering
