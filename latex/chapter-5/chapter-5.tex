@@ -47,7 +47,7 @@ Python tests validate BabyJubJub ElGamal primitives:
 
 At the time of evaluation, the local test baseline was:
 \begin{itemize}
-    \item Hardhat tests: 32 passed.
+    \item Hardhat tests: 33 passed.
     \item Python crypto tests: 43 passed.
 \end{itemize}
 
@@ -66,13 +66,13 @@ To improve reproducibility, this dissertation records a concrete execution snaps
 \toprule
 Suite & Passed & Runtime & Command \\ 
 \midrule
-Hardhat contract/integration tests & 32/32 & about 36 s & \texttt{npm test} \\
+Hardhat contract/integration tests & 33/33 & about 6 s & \texttt{npm test} \\
 Python cryptography unit tests & 43/43 & 21.31 s & \texttt{python -m pytest tests/ -q} \\ 
 \bottomrule
 \end{tabular}
 \end{table}
 
-Both suites completed with zero failures, for a combined 75 passing tests. This does not prove security in adversarial deployment, but it gives strong evidence that the implementation claims in Chapters 3--4 are executable and internally consistent on a fresh local run.
+Both suites completed with zero failures, for a combined 76 passing tests. This does not prove security in adversarial deployment, but it gives strong evidence that the implementation claims in Chapters 3--4 are executable and internally consistent on a fresh local run.
 
 Table \ref{tab:evaluation-scenarios} provides a scenario-oriented view of what was validated and what evidence was observed.
 
@@ -131,7 +131,7 @@ Circuit & Constraints & Wires & Public Inputs & Private Inputs \\
 \end{tabular}
 \end{table}
 
-Both circuits operate on the BN128 (BN254) curve. The vote proof circuit encodes commitment verification, candidate range checks, one-hot encryption validity for $N$ candidates, and ciphertext hash binding. The tally proof circuit encodes key ownership, per-candidate decryption correctness, and sum consistency. Constraint counts scale linearly with $N$ due to per-candidate ElGamal verification sub-circuits.
+Both circuits operate on the BN254 (also referred to as BN128) curve. The vote proof circuit encodes commitment verification, candidate range checks, one-hot encryption validity for $N$ candidates, and ciphertext hash binding. The tally proof circuit encodes key ownership, per-candidate decryption correctness, and sum consistency. Constraint counts scale linearly with $N$ due to per-candidate ElGamal verification sub-circuits.
 
 \subsection{Client-Side Artifact Footprint}
 
@@ -173,7 +173,7 @@ Table \ref{tab:gas-costs} reports the estimated gas consumption for each major o
 \toprule
 Operation & Estimated Gas & Dominant Cost Component \\
 \midrule
-\texttt{castVote} (voter) & 315{,}000--340{,}000 & Groth16 verification ($\sim$181k) + 4$\times$SSTORE ($\sim$80k) + calldata \\
+\texttt{castVote} (voter) & 315{,}000--340{,}000 & Groth16 verification ($\sim$181k) + about 6 cold SSTOREs ($\sim$120k) + one warm state update + calldata \\
 \texttt{updateTallyResults} (admin) & 310{,}000--330{,}000 & Groth16 verification ($\sim$181k) + result loop SSTORE + event \\
 \texttt{addCandidates} & $\sim$80{,}000 & Two candidate SSTOREs + candidateCount SSTORE + two events \\
 \texttt{startElection} & $\sim$28{,}000 & Single SSTORE for status transition \\
@@ -183,7 +183,7 @@ Operation & Estimated Gas & Dominant Cost Component \\
 \end{tabular}
 \end{table}
 
-To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.0096--0.0102~ETH (\$24--\$26), and one \texttt{updateTallyResults} costs approximately 0.0093--0.0099~ETH (\$23--\$25). The Ethereum block gas limit (30M gas) can accommodate roughly 88--95 vote transactions per block if they were the only transactions, although in practice, block space is shared. (Gas price and ETH price figures are illustrative values used at the time of evaluation; actual costs vary with network conditions.)
+To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.00945--0.0102~ETH (\$24--\$26), and one \texttt{updateTallyResults} costs approximately 0.0093--0.0099~ETH (\$23--\$25). The Ethereum block gas limit (30M gas) can accommodate roughly 88--95 vote transactions per block if they were the only transactions, although in practice, block space is shared. (Gas price and ETH price figures are illustrative values used at the time of evaluation; actual costs vary with network conditions.)
 
 \subsection{Proof Generation Latency}
 
@@ -219,9 +219,9 @@ The system's scalability characteristics vary by component. On-chain gas per vot
 
 \begin{itemize}
     \item \textbf{Tally aggregation} requires $O(VN)$ elliptic-curve point additions, performed off-chain by the administrator. For $V = 1{,}000$ votes and $N = 2$ candidates, this amounts to 2{,}000 point additions, completing in under one second on modern hardware.
-    \item \textbf{Discrete-log recovery} during tally decryption uses runtime baby-step giant-step with complexity $O(\sqrt{B_{dlog}})$. No persistent global precomputed table is required; instead, a temporary baby-step map of size $O(\sqrt{B_{dlog}})$ is built in memory during tally. Since per-candidate tallies are bounded above by $V$, the current bound $B_{dlog}=V+100$ is sufficient for correctness but may become a client-side bottleneck for very large elections.
+    \item \textbf{Discrete-log recovery} during tally decryption uses runtime baby-step giant-step. Per candidate, complexity is $O(\sqrt{B_{dlog}})$; for an election with $N$ candidates, full tally recovery is $O(N\sqrt{B_{dlog}})$. No persistent global precomputed table is required; instead, a temporary baby-step map of size $O(\sqrt{B_{dlog}})$ is built in memory during each recovery call. Since per-candidate tallies are bounded above by $V$, the current bound $B_{dlog}=V+100$ is sufficient for correctness but may become a client-side bottleneck for very large elections.
     \item \textbf{Merkle tree construction} is $O(V)$ with $O(\log V)$ verification per inclusion check. For $V = 10{,}000$ commitments, tree construction completes in milliseconds.
-    \item \textbf{Circuit constraint scaling}: increasing the number of candidates from $N = 2$ to $N = 10$ would increase vote proof constraints approximately 4.8$\times$ (from $\sim$15k to $\sim$73k), proportionally increasing proof generation time and proving key size.
+    \item \textbf{Circuit constraint scaling}: constraint growth is approximately linear in $N$ for the per-candidate ElGamal sub-circuits, but exact totals require recompilation for each target $N$. Therefore, values beyond $N=2$ in this dissertation are treated as extrapolative rather than measured. In addition, straightforward scaling in the current vote-circuit layout is bounded by the ciphertext-hash arity (\texttt{Poseidon(4N)}), so larger-$N$ support requires circuit-level hash-layout refactoring before claiming concrete higher-$N$ counts.
 \end{itemize}
 
 Table \ref{tab:scalability-summary} summarizes the scaling profile.
@@ -237,7 +237,7 @@ Component & Complexity & Practical Bound \\
 \midrule
 Per-vote on-chain cost & $O(1)$ & Constant $\sim$330k gas per vote \\
 Tally aggregation (off-chain) & $O(VN)$ & Practical up to $V = 10^5$ \\
-DLog recovery (off-chain) & $O(\sqrt{B_{dlog}})$ & Current admin client uses $B_{dlog}=V+100$ \\
+DLog recovery (off-chain) & $O(N\sqrt{B_{dlog}})$ & Current admin client uses $B_{dlog}=V+100$ \\
 Merkle tree build (off-chain) & $O(V)$ & Practical up to $V = 10^6$ \\
 Inclusion verification & $O(\log V)$ & Negligible for all practical $V$ \\
 Proof generation (client) & $O(C_{vote})$ & Scales with vote-circuit constraints, where $C_{vote}\approx aN+b$ for fixed circuit design \\
