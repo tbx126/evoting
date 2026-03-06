@@ -173,17 +173,17 @@ Table \ref{tab:gas-costs} reports measured gas consumption from transaction rece
 \toprule
 Operation & Measured Gas & Dominant Cost Component \\
 \midrule
-\texttt{castVote} (voter) & 367{,}462--401{,}734 & Groth16 verification ($\sim$181k) + vote record writes + encrypted payload event emission \\
-\texttt{updateTallyResults} (admin) & 478{,}182 & Groth16 verification ($\sim$181k) + tally-result writes + Merkle-root finalization + events \\
-\texttt{addCandidates} & 127{,}684 & Two candidate writes + candidateCount update + events \\
-\texttt{startElection} & 31{,}927 & Status transition write \\
-\texttt{endElection} & 29{,}841 & Status transition write \\
+\texttt{castVote} (voter) & 367{,}494--401{,}682 & Groth16 verification ($\sim$181k) + vote record writes + encrypted payload event emission \\
+\texttt{updateTallyResults} (admin) & 498{,}307 & Groth16 verification ($\sim$181k) + tally-result writes + Merkle-root finalization + events \\
+\texttt{addCandidates} & 127{,}649 & Two candidate writes + candidateCount update + events \\
+\texttt{startElection} & 31{,}924 & Status transition write \\
+\texttt{endElection} & 29{,}839 & Status transition write \\
 \texttt{registerVoter} (single) & 75{,}219--92{,}331 & Registration mapping write; the first registration on a fresh deployment is highest \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.0110--0.0121~ETH (\$27.6--\$30.1), and one \texttt{updateTallyResults} costs approximately 0.01435~ETH (\$35.9). Under a 30M gas block limit, a block could fit roughly 74--81 vote transactions if they were the only transactions, although in practice, block space is shared and gas prices vary.
+To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.01102--0.01205~ETH (\$27.6--\$30.1), and one \texttt{updateTallyResults} costs approximately 0.01495~ETH (\$37.4). Under a 30M gas block limit, a block could fit roughly 74--81 vote transactions if they were the only transactions, although in practice, block space is shared and gas prices vary.
 
 \subsection{Proof Generation Latency}
 
@@ -204,14 +204,14 @@ Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170 \c
 \toprule
 Contract & Deployed Size & Notes \\
 \midrule
-\texttt{Voting} & 10{,}369 bytes (10.1 KB) & Main election logic with integrated voter registration; largest contract \\
+\texttt{Voting} & 10{,}168 bytes (9.9 KB) & Main election logic with integrated voter registration; largest contract \\
 \texttt{VoteVerifier} & 1{,}658 bytes (1.6 KB) & Groth16 verifier (snarkjs-generated) \\
 \texttt{TallyVerifier} & 2{,}690 bytes (2.6 KB) & Groth16 verifier (snarkjs-generated) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The total deployed bytecode across all three contracts is 14{,}717 bytes. The Voting contract is the largest at about 42\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. The Groth16 verifier contracts remain compact because snarkjs generates optimized inline pairing-check code.
+The total deployed bytecode across all three contracts is 14{,}516 bytes. The Voting contract is the largest at about 41\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. The Groth16 verifier contracts remain compact because snarkjs generates optimized inline pairing-check code.
 
 \subsection{Scalability Discussion}
 
