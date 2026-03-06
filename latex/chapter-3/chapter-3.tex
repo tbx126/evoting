@@ -258,7 +258,7 @@ Election ID & Bundle + receipt metadata & Prevents cross-election replay or acci
 For $V$ votes and $N$ candidates:
 \begin{itemize}
     \item ballot encryption complexity is $O(N)$ per voter;
-    \item vote-proof generation is the dominant per-voter latency (measured at 3--8 seconds in the current circuit scale) and is not captured by the $O(N)$ encryption term;
+    \item vote-proof generation is the dominant per-voter latency (measured at approximately 0.6--1.1 seconds for the current $N=2$ circuit scale in local Node.js evaluation) and is not captured by the $O(N)$ encryption term;
     \item tally aggregation complexity is $O(VN)$ point additions;
     \item single inclusion proof verification is $O(\log V)$ hash operations.
 \end{itemize}

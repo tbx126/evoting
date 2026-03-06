@@ -66,8 +66,8 @@ To improve reproducibility, this dissertation records a concrete execution snaps
 \toprule
 Suite & Passed & Runtime & Command \\ 
 \midrule
-Hardhat contract/integration tests & 33/33 & about 6 s & \texttt{npm test} \\
-Python cryptography unit tests & 43/43 & 21.31 s & \texttt{python -m pytest tests/ -q} \\ 
+Hardhat contract/integration tests & 33/33 & 20 s & \texttt{npm test} \\
+Python cryptography unit tests & 43/43 & 27.59 s & \texttt{python -m pytest tests/ -q} \\ 
 \bottomrule
 \end{tabular}
 \end{table}
@@ -114,7 +114,7 @@ This section reports quantitative measurements of the system's on-chain gas cons
 
 \subsection{Circuit Complexity}
 
-Table \ref{tab:circuit-complexity} summarizes the R1CS constraint systems produced by circom compilation. These values were extracted from the compiled \texttt{.r1cs} files using \texttt{snarkjs r1cs info}.
+Table \ref{tab:circuit-complexity} summarizes the R1CS constraint systems produced by a fresh local Circom recompilation of the current repository revision. These values were extracted from the generated \texttt{.r1cs} files using \texttt{snarkjs r1cs info}.
 
 \begin{table}[htbp]
 \centering
@@ -146,48 +146,48 @@ Proof generation in the browser requires downloading WASM witness generators and
 \toprule
 Artifact & Size & Role \\
 \midrule
-\texttt{vote\_proof.wasm} & 2.94 MB & Witness generator for vote proof \\
-\texttt{vote\_proof\_final.zkey} & 7.11 MB & Proving key for vote proof \\
-\texttt{tally\_proof.wasm} & 143.0 KB & Witness generator for tally proof \\
-\texttt{tally\_proof\_final.zkey} & 9.12 MB & Proving key for tally proof \\
-\texttt{vote\_proof.r1cs} & 2.79 MB & Constraint system (build-time only) \\
-\texttt{tally\_proof.r1cs} & 3.24 MB & Constraint system (build-time only) \\
+\texttt{vote\_proof.wasm} & 2.94 MiB & Witness generator for vote proof \\
+\texttt{vote\_proof\_final.zkey} & 7.11 MiB & Proving key for vote proof \\
+\texttt{tally\_proof.wasm} & 143.0 KiB & Witness generator for tally proof \\
+\texttt{tally\_proof\_final.zkey} & 9.12 MiB & Proving key for tally proof \\
+\texttt{vote\_proof.r1cs} & 2.79 MiB & Constraint system (build-time only) \\
+\texttt{tally\_proof.r1cs} & 3.24 MiB & Constraint system (build-time only) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-For a voter casting a ballot, the browser must load approximately 10.0~MB of proof artifacts (WASM + zkey). This is a one-time download per session and can be cached. The administrator performing a tally loads approximately 9.3~MB. These sizes are consistent with typical Groth16 deployments at this constraint scale and are within practical browser download budgets for modern connections.
+For a voter casting a ballot, the browser must load approximately 10.06~MiB of proof artifacts (WASM + zkey). This is a one-time download per session and can be cached. The administrator performing a tally loads approximately 9.26~MiB. These sizes are consistent with typical Groth16 deployments at this constraint scale and are within practical browser download budgets for modern connections.
 
 \subsection{On-Chain Gas Consumption}
 
 Gas costs are central to evaluating blockchain-based protocol feasibility. Groth16 proof verification dominates the on-chain cost due to the \texttt{ecPairing} precompile, which on EVM costs $45{,}000 + 34{,}000 \times k$ gas for $k$ pairing checks (Groth16 uses $k = 4$, yielding 181{,}000 gas for the pairing alone).
 
-Table \ref{tab:gas-costs} reports the estimated gas consumption for each major on-chain operation, broken down by component. These estimates are derived from EVM opcode pricing (EIP-1108 precompile costs \cite{eip1108}, EIP-2929 cold/warm storage access costs \cite{eip2929}) applied to the contract logic in \texttt{Voting.sol}.
+Table \ref{tab:gas-costs} reports measured gas consumption from transaction receipts in a fresh local Hardhat run against the current repository revision. The dominant cost components are interpreted with reference to EIP-1108 precompile costs \cite{eip1108} and the storage-access behavior of \texttt{Voting.sol}.
 
 \begin{table}[htbp]
 \centering
 \small
-\caption{Estimated Gas Consumption Per Operation}
+\caption{Measured Gas Consumption Per Operation (Local Hardhat Run)}
 \label{tab:gas-costs}
 \begin{tabular}{L{4.5cm} L{2.5cm} L{5.5cm}}
 \toprule
-Operation & Estimated Gas & Dominant Cost Component \\
+Operation & Measured Gas & Dominant Cost Component \\
 \midrule
-\texttt{castVote} (voter) & 315{,}000--340{,}000 & Groth16 verification ($\sim$181k) + about 6 cold SSTOREs ($\sim$120k) + one warm state update + calldata \\
-\texttt{updateTallyResults} (admin) & 310{,}000--330{,}000 & Groth16 verification ($\sim$181k) + result loop SSTORE + event \\
-\texttt{addCandidates} & $\sim$80{,}000 & Two candidate SSTOREs + candidateCount SSTORE + two events \\
-\texttt{startElection} & $\sim$28{,}000 & Single SSTORE for status transition \\
-\texttt{endElection} & $\sim$28{,}000 & Single SSTORE for status transition \\
-\texttt{registerVoter} (single) & $\sim$48{,}000 & SSTORE for registration record \\
+\texttt{castVote} (voter) & 367{,}462--401{,}734 & Groth16 verification ($\sim$181k) + vote record writes + encrypted payload event emission \\
+\texttt{updateTallyResults} (admin) & 478{,}182 & Groth16 verification ($\sim$181k) + tally-result writes + Merkle-root finalization + events \\
+\texttt{addCandidates} & 127{,}684 & Two candidate writes + candidateCount update + events \\
+\texttt{startElection} & 31{,}927 & Status transition write \\
+\texttt{endElection} & 29{,}841 & Status transition write \\
+\texttt{registerVoter} (single) & 75{,}219--92{,}331 & Registration mapping write; the first registration on a fresh deployment is highest \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.00945--0.0102~ETH (\$24--\$26), and one \texttt{updateTallyResults} costs approximately 0.0093--0.0099~ETH (\$23--\$25). The Ethereum block gas limit (30M gas) can accommodate roughly 88--95 vote transactions per block if they were the only transactions, although in practice, block space is shared. (Gas price and ETH price figures are illustrative values used at the time of evaluation; actual costs vary with network conditions.)
+To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.0110--0.0121~ETH (\$27.6--\$30.1), and one \texttt{updateTallyResults} costs approximately 0.01435~ETH (\$35.9). Under a 30M gas block limit, a block could fit roughly 74--81 vote transactions if they were the only transactions, although in practice, block space is shared and gas prices vary.
 
 \subsection{Proof Generation Latency}
 
-Groth16 proof generation is the most computationally intensive client-side operation. It involves multi-scalar multiplication over the proving key, which scales with the number of circuit constraints. For the current configuration ($N = 2$), the project test suite reports proof generation times of approximately 3--8 seconds per vote proof and 4--10 seconds per tally proof when executed in Node.js (snarkjs, single-threaded) on a mid-range laptop (Intel Core i7, 16 GB RAM). Browser-based execution using snarkjs WASM is expected to exhibit similar or moderately longer latencies depending on device hardware.
+Groth16 proof generation is the most computationally intensive client-side operation. It involves multi-scalar multiplication over the proving key, which scales with the number of circuit constraints. For the current configuration ($N = 2$), a fresh local Node.js measurement on the current repository revision produced vote-proof latencies between 615~ms and 1{,}052~ms across three representative ballots, and a tally-proof latency of about 848~ms. Browser-based execution using snarkjs WASM is expected to be similar or somewhat slower depending on device hardware and caching behavior.
 
 These times are acceptable for a prototype where voters submit one ballot per election. However, they represent a usability consideration: the voter interface should communicate proof-generation progress to avoid the impression of an unresponsive application.
 
@@ -204,14 +204,14 @@ Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170 \c
 \toprule
 Contract & Deployed Size & Notes \\
 \midrule
-\texttt{Voting} & 9{,}481 bytes (9.3 KB) & Main election logic with integrated voter registration; largest contract \\
+\texttt{Voting} & 10{,}369 bytes (10.1 KB) & Main election logic with integrated voter registration; largest contract \\
 \texttt{VoteVerifier} & 1{,}658 bytes (1.6 KB) & Groth16 verifier (snarkjs-generated) \\
 \texttt{TallyVerifier} & 2{,}690 bytes (2.6 KB) & Groth16 verifier (snarkjs-generated) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The total deployed bytecode across all three contracts is 13{,}829 bytes. The Voting contract is the largest at 39\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. Merging voter registration into the Voting contract increased its size by 983 bytes while eliminating two separate deployments. The Groth16 verifier contracts are compact because snarkjs generates optimized inline pairing-check code.
+The total deployed bytecode across all three contracts is 14{,}717 bytes. The Voting contract is the largest at about 42\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. The Groth16 verifier contracts remain compact because snarkjs generates optimized inline pairing-check code.
 
 \subsection{Scalability Discussion}
 
@@ -235,7 +235,7 @@ Table \ref{tab:scalability-summary} summarizes the scaling profile.
 \toprule
 Component & Complexity & Practical Bound \\
 \midrule
-Per-vote on-chain cost & $O(1)$ & Constant $\sim$330k gas per vote \\
+Per-vote on-chain cost & $O(1)$ & Constant $\sim$367k--402k gas per vote \\
 Tally aggregation (off-chain) & $O(VN)$ & Practical up to $V = 10^5$ \\
 DLog recovery (off-chain) & $O(N\sqrt{B_{dlog}})$ & Current admin client uses $B_{dlog}=V+100$ \\
 Merkle tree build (off-chain) & $O(V)$ & Practical up to $V = 10^6$ \\
@@ -344,7 +344,7 @@ Code review identified three remaining gaps that affect full assurance. Gaps are
 \begin{itemize}
     \item \textbf{[P1] Result binding gap}: contract verifies tally proof but does not strictly bind the submitted integer result vector to all public signals used by the circuit. This can allow inconsistencies if external checks are not enforced.
     \item \textbf{[P1] Ciphertext event binding gap}: the emitted encrypted payload is not fully bound to on-chain stored ciphertext hash. If an attacker can influence event payload parsing or indexing, off-chain tally can be poisoned.
-    \item \textbf{[P2] Merkle root mutability}: a direct root-update function exists without strict lifecycle gating; this increases governance attack surface.
+    \item \textbf{[P2] Merkle root mutability}: an admin-only root-update function remains available before tally finalization; although overwrites are rejected once the election reaches \texttt{Tallied}, the pre-finalization update path still increases governance attack surface.
 \end{itemize}
 
 These issues do not invalidate the prototype's educational value or end-to-end demonstration, but they prevent claiming full compliance with ``fully functional'' in a high-assurance sense.
@@ -360,9 +360,9 @@ Figure \ref{fig:assurance-gap} illustrates the current assurance profile: strong
     \node[font=\small] at (3.8,0.5) {Implemented and validated};
     \node[font=\small] at (8.8,0.5) {Hardening gap};
 
-    \node[anchor=west, font=\small] at (0,-0.5) {Approximate assurance split: 76\% functional completion / 24\% remaining hardening};
+    \node[anchor=west, font=\small] at (0,-0.5) {Illustrative only: core workflow implemented; hardening remains};
 \end{tikzpicture}
-\caption{Current Assurance Profile}
+\caption{Current Assurance Profile (Illustrative)}
 \label{fig:assurance-gap}
 \end{figure}
 

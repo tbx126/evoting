@@ -22,32 +22,37 @@ Key folders used during reproduction:
 
 \section{Dependency Installation}
 \begin{verbatim}
-npm install
+npm ci
 pip install -r requirements.txt
+npm run compile
 \end{verbatim}
 
+The repository tracks \texttt{package-lock.json} and the browser bundle \texttt{frontend/lib/circomlibjs.bundle.js}, so no additional frontend bundling step is required before running the local demo.
+
 \section{ZKP Artifact Prerequisites}
-Before running the frontend flow, ensure the following files exist under \texttt{frontend/zk/}:
+Before running either the frontend flow or the Hardhat integration tests, ensure the following files exist under \texttt{frontend/zk/}:
 \begin{itemize}
     \item \texttt{vote\_proof.wasm}
     \item \texttt{vote\_proof\_final.zkey}
     \item \texttt{tally\_proof.wasm}
     \item \texttt{tally\_proof\_final.zkey}
 \end{itemize}
-These artifacts are not committed to the repository and must be generated or provisioned separately. They must match the deployed verifier contracts; otherwise proof generation or on-chain verification will fail.
+These artifacts are not committed to Git and must be generated or provisioned separately. They must match the deployed verifier contracts; otherwise proof generation or on-chain verification will fail.
 
 \section{Local Development Run}
 A standard local run uses three terminals:
 \begin{verbatim}
 # Terminal 1
-npx hardhat node
+npm run node
 
 # Terminal 2
-npx hardhat run scripts/deploy.js --network localhost
+npm run deploy:local
 
 # Terminal 3
-python -m uvicorn server:app --port 8000
+npm run server
 \end{verbatim}
+
+The local deployment command generates \texttt{frontend/config.js}, pre-adds two candidates, registers the first five Hardhat accounts as voters, and---if \texttt{ELGAMAL\_SK} is not set---generates a local bootstrap ElGamal administrator secret key.
 
 Then open:
 \begin{itemize}
@@ -58,7 +63,7 @@ Then open:
 \section{Test Execution}
 Run both verification suites:
 \begin{verbatim}
-npx hardhat test
+npm test
 python -m pytest tests/ -q
 \end{verbatim}
 
@@ -69,7 +74,7 @@ python -m pytest tests/ -q
     \item Start election.
     \item On voter page: connect wallet, select candidate, submit vote. Repeat for multiple voters.
     \item On admin page: end election.
-    \item Load administrator secret key, run tally procedure, submit tally with ZKP3.
+    \item Load administrator secret key, run tally procedure, submit tally with ZKP3. \textit{In local development mode, the admin page displays the generated bootstrap key for convenience, but the administrator must still click the key-loading action explicitly before tallying.}
     \item Export \texttt{audit\_bundle.json}.
     \item On voter page: paste receipt JSON and audit bundle JSON, run anonymous verification.
 \end{enumerate}

@@ -159,18 +159,18 @@ Third, ElGamal tally decryption relies on bounded runtime discrete-log recovery 
 
 \section{Deployment Notes}
 
-Local deployment uses a Hardhat node and a Python-served static frontend. The deployment script (\texttt{scripts/deploy.js}) generates \texttt{frontend/config.js} automatically, which is required before the frontend pages can interact with the deployed contracts.
+Local deployment uses a Hardhat node and a Python-served static frontend. The deployment script (\texttt{scripts/deploy.js}) generates \texttt{frontend/config.js} automatically, which is required before the frontend pages can interact with the deployed contracts. In local mode, if \texttt{ELGAMAL\_SK} is not supplied, the script also generates a bootstrap administrator secret key and exposes it to the admin page as a visible hint; the administrator must still explicitly load that key before tallying.
 
 For testnet or mainnet deployment, the following additional steps apply:
 \begin{itemize}
-    \item Generate and securely store an ElGamal keypair before deployment. Pass \texttt{PK} into the Voting constructor, and keep \texttt{sk} outside the contract and off persistent storage; load it into the administrator client only at tally time.
+    \item For non-local deployment, either provide \texttt{ELGAMAL\_SK} in \texttt{.env} or provide the public key coordinates \texttt{ELGAMAL\_PK\_X} and \texttt{ELGAMAL\_PK\_Y}. The current deployment script intentionally has no insecure fallback administrator key.
     \item Configure \texttt{.env} with the deployer private key and the target network RPC URL before running the deploy script.
-    \item Ensure the \texttt{frontend/zk/} directory contains the compiled WASM witness generators and proving key files (\texttt{.zkey}) corresponding to the deployed verifier contracts.
+    \item Ensure the \texttt{frontend/zk/} directory contains the compiled WASM witness generators and proving key files (\texttt{.zkey}) corresponding to the deployed verifier contracts. The same artifacts are required by both the browser flow and the Hardhat integration tests.
     \item Configure MetaMask in the voter and administrator browsers to point to the correct network (chain ID must match the deployment target).
     \item The trusted setup lineage (the \texttt{.ptau} used for key generation and circuit-specific \texttt{.zkey} files) must be kept consistent with the deployed verifier contracts. Recompiling circuits without redeploying verifiers will cause all proof submissions to fail.
 \end{itemize}
 
-These operational dependencies are documented in the repository README and deployment scripts.
+These operational dependencies are documented in the repository README, reflected in the package scripts, and enforced by the deployment script.
 
 \section{Chapter Summary}
 
