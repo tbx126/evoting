@@ -537,6 +537,14 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                     管理员需要输入 ElGamal 私钥用于解密投票结果
                 </div>
+                <div id="bootstrapKeyPanel" class="alert alert-info" style="display:none;align-items:flex-start;flex-direction:column;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H7"/></svg>
+                        <span>本地启动生成的测试 ElGamal 私钥如下。展示不等于已加载，计票前仍需点击下方“加载密钥”。</span>
+                    </div>
+                    <div id="bootstrapKeyValue" class="mono-data" style="width:100%;word-break:break-all;padding:8px 10px;border-radius:8px;background:rgba(15,23,42,0.45);border:1px solid var(--color-border);"></div>
+                    <button type="button" class="btn btn-sm" style="width:auto;margin-bottom:0;" onclick="copyBootstrapKeyToInput()">填入输入框</button>
+                </div>
                 <div class="input-group">
                     <label>ElGamal 私钥 (sk)</label>
                     <div class="sk-input-wrap">
@@ -751,21 +759,58 @@
                 eyeClosed.style.display = 'none';
             }
         }
+        function getBootstrapAdminKey() {
+            return CONTRACT_CONFIG.LOCAL_BOOTSTRAP_ADMIN_SK || null;
+        }
+        function renderBootstrapKeyHint() {
+            const bootstrapKey = getBootstrapAdminKey();
+            const panel = document.getElementById('bootstrapKeyPanel');
+            const value = document.getElementById('bootstrapKeyValue');
+            if (!panel || !value) return;
+            if (!bootstrapKey) {
+                panel.style.display = 'none';
+                return;
+            }
+            value.textContent = bootstrapKey;
+            panel.style.display = 'flex';
+        }
+        function copyBootstrapKeyToInput() {
+            const bootstrapKey = getBootstrapAdminKey();
+            if (!bootstrapKey) {
+                addLog('当前没有可用的本地测试私钥提示', 'warning');
+                return;
+            }
+            document.getElementById('adminSK').value = bootstrapKey;
+            document.getElementById('adminSK').focus();
+            addLog('已将本地测试私钥填入输入框；请继续点击“加载密钥”完成校验', 'info');
+        }
         function loadAdminKey() {
             const skInput = document.getElementById('adminSK').value.trim();
             if (!skInput) { addLog('请输入 ElGamal 私钥', 'warning'); return; }
             try {
-                adminSK = BigInt(skInput);
+                const loadedSK = BigInt(skInput);
                 const G = elgamal.getGenerator();
-                const derivedPK = elgamal.scalarMul(adminSK, G);
+                const derivedPK = elgamal.scalarMul(loadedSK, G);
+                const expectedPK = adminPK || elgamal.pkFromBigInts(CONTRACT_CONFIG.ELGAMAL_PK.x, CONTRACT_CONFIG.ELGAMAL_PK.y);
+                const derivedX = elgamal.fromF(derivedPK[0]).toString();
+                const derivedY = elgamal.fromF(derivedPK[1]).toString();
+                const expectedX = elgamal.fromF(expectedPK[0]).toString();
+                const expectedY = elgamal.fromF(expectedPK[1]).toString();
+                if (derivedX !== expectedX || derivedY !== expectedY) {
+                    throw new Error('私钥与当前 ElGamal 公钥不匹配');
+                }
+                adminSK = loadedSK;
                 document.getElementById('keyStatus').textContent =
                     `密钥已加载 (PK.x: ${elgamal.fromF(derivedPK[0]).toString().slice(0, 20)}...)`;
                 document.getElementById('keyStatus').style.color = 'var(--color-cta)';
                 addLog('ElGamal 私钥已加载', 'success');
             } catch (e) {
+                adminSK = null;
+                const message = e && e.message ? e.message : '密钥加载失败';
                 addLog(`密钥加载失败: ${e.message}`, 'error');
                 document.getElementById('keyStatus').textContent = '密钥格式错误';
                 document.getElementById('keyStatus').style.color = 'var(--color-danger)';
+                document.getElementById('keyStatus').textContent = message;
             }
         }
         async function connectWallet() {
@@ -831,10 +876,7 @@
                 document.getElementById('adminSubtitle').textContent =
                     `${currentAccount.slice(0, 6)}...${currentAccount.slice(-4)} | ${CONTRACT_CONFIG.NETWORK.name}`;
 
-                if (CONTRACT_CONFIG.DEV_ADMIN_SK) {
-                    document.getElementById('adminSK').value = CONTRACT_CONFIG.DEV_ADMIN_SK;
-                    addLog('检测到开发模式，已自动填充测试 ElGamal 私钥', 'warning');
-                }
+
 
                 addLog(`已连接: ${currentAccount.slice(0, 10)}...`, 'success');
                 await loadElectionInfo();
@@ -1272,6 +1314,10 @@
         }
 
         window.addEventListener('load', async () => {
+            renderBootstrapKeyHint();
+            if (getBootstrapAdminKey()) {
+                addLog('已显示本地测试 ElGamal 私钥；计票前仍需手动加载', 'info');
+            }
             addLog('管理员控制台已加载 (ZKP 版本)', 'info');
             try {
                 elgamal = await ElGamalLib.init();

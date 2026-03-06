@@ -1,115 +1,177 @@
 /**
- * 合约部署脚本 (本地 + Sepolia 通用)
+ * Unified deployment script for local and Sepolia networks.
  *
- * 本地: npx hardhat run scripts/deploy.js --network localhost
- * 测试网: npx hardhat run scripts/deploy.js --network sepolia
+ * Local:
+ *   npx hardhat run scripts/deploy.js --network localhost
  *
- * 本地模式额外操作: 添加候选人 张三/李四, 注册前5个测试账户为选民
+ * Sepolia:
+ *   npx hardhat run scripts/deploy.js --network sepolia
  */
 
 const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
+const { buildBabyjub } = require("circomlibjs");
 
-const DEV_SK = "12345678901234567890";
+const LOCAL_DEFAULT_TITLE = "本地演示选举";
+const LOCAL_DEFAULT_DESCRIPTION = "零知识证明保护的电子投票演示";
+const BJJ_SUBGROUP_ORDER = 2736030358979909402780800718157159386076813972158567259200215660948447373041n;
+
+function randomSubgroupScalar() {
+  const bytes = crypto.randomBytes(32);
+  let value = 0n;
+  for (const byte of bytes) {
+    value = (value << 8n) | BigInt(byte);
+  }
+  return ((value % (BJJ_SUBGROUP_ORDER - 1n)) + 1n).toString();
+}
 
 async function computeElGamalPK(sk) {
-  const { buildBabyjub } = require("circomlibjs");
   const bjj = await buildBabyjub();
-  const F = bjj.F;
-  const G = [
-    F.e(5299619240641551281634865583518297030282874472190772894086521144482721001553n),
-    F.e(16950150798460657717958625567821834550301663161624707787222815936182638968203n),
+  const field = bjj.F;
+  const generator = [
+    field.e(5299619240641551281634865583518297030282874472190772894086521144482721001553n),
+    field.e(16950150798460657717958625567821834550301663161624707787222815936182638968203n),
   ];
-  const pk = bjj.mulPointEscalar(G, BigInt(sk));
-  return [F.toObject(pk[0]).toString(), F.toObject(pk[1]).toString()];
+  const pk = bjj.mulPointEscalar(generator, BigInt(sk));
+  return [field.toObject(pk[0]).toString(), field.toObject(pk[1]).toString()];
+}
+
+async function resolveKeyMaterial(isLocal) {
+  const hasProvidedPK = process.env.ELGAMAL_PK_X && process.env.ELGAMAL_PK_Y;
+
+  if (hasProvidedPK) {
+    return {
+      pkX: process.env.ELGAMAL_PK_X,
+      pkY: process.env.ELGAMAL_PK_Y,
+      localBootstrapSK: isLocal ? (process.env.ELGAMAL_SK || null) : null,
+      keySource: "provided-public-key",
+    };
+  }
+
+  if (process.env.ELGAMAL_SK) {
+    const sk = process.env.ELGAMAL_SK;
+    const [pkX, pkY] = await computeElGamalPK(sk);
+    return {
+      pkX,
+      pkY,
+      localBootstrapSK: isLocal ? sk : null,
+      keySource: isLocal ? "local-env-secret-key" : "secret-key",
+    };
+  }
+
+  if (isLocal) {
+    const generatedSK = randomSubgroupScalar();
+    const [pkX, pkY] = await computeElGamalPK(generatedSK);
+    return {
+      pkX,
+      pkY,
+      localBootstrapSK: generatedSK,
+      keySource: "generated-local-secret-key",
+    };
+  }
+
+  throw new Error(
+    "For non-local deployment, set ELGAMAL_SK or provide ELGAMAL_PK_X and ELGAMAL_PK_Y."
+  );
 }
 
 async function main() {
   const isLocal = ["localhost", "hardhat"].includes(hre.network.name);
-  console.log("部署网络:", hre.network.name);
+  console.log("Deploying to network:", hre.network.name);
 
   const signers = await hre.ethers.getSigners();
   const deployer = signers[0];
-  console.log("部署账户:", deployer.address);
+  console.log("Deployer:", deployer.address);
 
-  // ElGamal 公钥
-  let pkX, pkY;
-  if (process.env.ELGAMAL_PK_X && process.env.ELGAMAL_PK_Y) {
-    [pkX, pkY] = [process.env.ELGAMAL_PK_X, process.env.ELGAMAL_PK_Y];
-  } else {
-    const sk = isLocal ? DEV_SK : (process.env.ELGAMAL_SK || DEV_SK);
-    [pkX, pkY] = await computeElGamalPK(sk);
-    console.log(`ElGamal PK 计算完成 (sk=${sk.slice(0, 8)}...)`);
-  }
+  const { pkX, pkY, localBootstrapSK, keySource } = await resolveKeyMaterial(isLocal);
+  console.log(`ElGamal key source: ${keySource}`);
 
-  // 部署所有合约
-  console.log("\n部署合约...");
   const deploy = async (name, ...args) => {
-    const c = await (await hre.ethers.getContractFactory(name)).deploy(...args);
-    await c.waitForDeployment();
-    const addr = await c.getAddress();
-    console.log(`  ${name}: ${addr}`);
-    return { contract: c, addr };
+    const contract = await (await hre.ethers.getContractFactory(name)).deploy(...args);
+    await contract.waitForDeployment();
+    const address = await contract.getAddress();
+    console.log(`  ${name}: ${address}`);
+    return { contract, address };
   };
 
-  const { addr: voteVerAddr }                      = await deploy("VoteVerifier");
-  const { addr: tallyVerAddr }                     = await deploy("TallyVerifier");
-  const { contract: voting, addr: votingAddr }     = await deploy("Voting",
-    "2026年度评选", "零知识证明保护投票隐私", voteVerAddr, tallyVerAddr, [pkX, pkY]);
+  console.log("\nDeploying contracts...");
+  const { address: voteVerifierAddress } = await deploy("VoteVerifier");
+  const { address: tallyVerifierAddress } = await deploy("TallyVerifier");
+  const { contract: voting, address: votingAddress } = await deploy(
+    "Voting",
+    LOCAL_DEFAULT_TITLE,
+    LOCAL_DEFAULT_DESCRIPTION,
+    voteVerifierAddress,
+    tallyVerifierAddress,
+    [pkX, pkY]
+  );
 
-  // 本地模式: 初始化候选人和选民
   if (isLocal) {
     await (await voting.addCandidates("张三", "李四")).wait();
-    const voters = signers.slice(1, 6).map(s => s.address);
+    const voters = signers.slice(1, 6).map((signer) => signer.address);
     await (await voting.registerVotersBatch(voters)).wait();
-    console.log("\n本地初始化: 2个候选人, 5个选民已注册");
+    console.log("\nLocal bootstrap complete: 2 candidates, 5 registered voters.");
   }
 
-  // 更新 .env
   const envPath = path.resolve(__dirname, "../.env");
   let env = "";
-  try { env = fs.readFileSync(envPath, "utf8"); } catch (_) {}
+  try {
+    env = fs.readFileSync(envPath, "utf8");
+  } catch (_) {}
   env = env.replace(/^(VOTING_CONTRACT_ADDRESS|VOTE_VERIFIER_ADDRESS|TALLY_VERIFIER_ADDRESS)=.*\n?/gm, "");
-  env = env.replace(/\n# 合约地址[\s\S]*?(?=\n#|$)/, "");
-  if (!env.endsWith("\n")) env += "\n";
-  env += `\n# 合约地址\nVOTING_CONTRACT_ADDRESS=${votingAddr}\nVOTE_VERIFIER_ADDRESS=${voteVerAddr}\nTALLY_VERIFIER_ADDRESS=${tallyVerAddr}\n`;
+  env = env.replace(/\n# Contract addresses[\s\S]*?(?=\n#|$)/, "");
+  if (!env.endsWith("\n") && env.length > 0) env += "\n";
+  env += `\n# Contract addresses\nVOTING_CONTRACT_ADDRESS=${votingAddress}\nVOTE_VERIFIER_ADDRESS=${voteVerifierAddress}\nTALLY_VERIFIER_ADDRESS=${tallyVerifierAddress}\n`;
   fs.writeFileSync(envPath, env);
 
-  // 生成 frontend/config.js
-  const networkCfg = isLocal
-    ? `{ name:"Localhost", chainId:31337, chainIdHex:"0x7a69" }`
-    : `{ name:"Sepolia", chainId:11155111, chainIdHex:"0xaa36a7", rpcUrl:"https://rpc.sepolia.org", explorerUrl:"https://sepolia.etherscan.io" }`;
+  const networkConfig = isLocal
+    ? `{ name: "Localhost", chainId: 31337, chainIdHex: "0x7a69" }`
+    : `{ name: "Sepolia", chainId: 11155111, chainIdHex: "0xaa36a7", rpcUrl: "https://rpc.sepolia.org", explorerUrl: "https://sepolia.etherscan.io" }`;
 
-  const devLine = isLocal ? `\n  DEV_ADMIN_SK: "${DEV_SK}",` : "";
+  const localSKLine = localBootstrapSK
+    ? `\n  LOCAL_BOOTSTRAP_ADMIN_SK: "${localBootstrapSK}",`
+    : "";
 
-  fs.writeFileSync(path.resolve(__dirname, "../frontend/config.js"),
-`// 合约配置 (由 deploy.js 自动生成)
+  fs.writeFileSync(
+    path.resolve(__dirname, "../frontend/config.js"),
+`// Contract configuration (auto-generated by scripts/deploy.js)
 const CONTRACT_CONFIG = {
-  VOTING_ADDRESS: "${votingAddr}",
-  VOTE_VERIFIER_ADDRESS: "${voteVerAddr}",
-  TALLY_VERIFIER_ADDRESS: "${tallyVerAddr}",
-  NETWORK: ${networkCfg},
-  ELGAMAL_PK: { x:"${pkX}", y:"${pkY}" },${devLine}
+  VOTING_ADDRESS: "${votingAddress}",
+  VOTE_VERIFIER_ADDRESS: "${voteVerifierAddress}",
+  TALLY_VERIFIER_ADDRESS: "${tallyVerifierAddress}",
+  NETWORK: ${networkConfig},
+  ELGAMAL_PK: { x: "${pkX}", y: "${pkY}" },${localSKLine}
   ZKP: {
     VOTE_PROOF_WASM: "zk/vote_proof.wasm",
     VOTE_PROOF_ZKEY: "zk/vote_proof_final.zkey",
     TALLY_PROOF_WASM: "zk/tally_proof.wasm",
     TALLY_PROOF_ZKEY: "zk/tally_proof_final.zkey"
   }
-};`);
+};`
+  );
 
-  console.log("\n部署完成:");
-  console.log("  Voting:       ", votingAddr);
-  console.log("  VoteVerifier: ", voteVerAddr);
-  console.log("  TallyVerifier:", tallyVerAddr);
+  console.log("\nDeployment complete:");
+  console.log("  Voting:       ", votingAddress);
+  console.log("  VoteVerifier: ", voteVerifierAddress);
+  console.log("  TallyVerifier:", tallyVerifierAddress);
 
   if (isLocal) {
-    console.log("\n启动服务: python -m uvicorn server:app --port 8000");
-    console.log("投票页面: http://localhost:8000/");
-    console.log("管理页面: http://localhost:8000/admin");
-    console.log("ElGamal私钥:", DEV_SK);
+    console.log("\nStart the app with: python -m uvicorn server:app --port 8000");
+    console.log("Voter page: http://localhost:8000/");
+    console.log("Admin page: http://localhost:8000/admin");
+    if (localBootstrapSK) {
+      console.log("\nLocal ElGamal admin key (displayed in /admin):");
+      console.log(localBootstrapSK);
+      console.log("The admin must still explicitly load this key in the UI before tallying.");
+    }
   }
 }
 
-main().then(() => process.exit(0)).catch(e => { console.error("部署失败:", e); process.exit(1); });
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error("Deployment failed:", error);
+    process.exit(1);
+  });
