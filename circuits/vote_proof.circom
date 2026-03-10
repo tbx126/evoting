@@ -9,7 +9,7 @@ include "lib/elgamal.circom";
 /**
  * VoteProof circuit - Proves ZKP1 (commitment correctness) + ZKP2 (one-hot validity)
  *
- * Naming convention (matches dissertation and CLAUDE.md):
+ * Naming convention (matches dissertation):
  *   ZKP1 = commitment correctness: commitment = Poseidon(candidateId, salt)
  *   ZKP2 = one-hot validity:       encrypted ballots form a valid one-hot vector
  *

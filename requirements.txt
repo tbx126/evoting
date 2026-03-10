@@ -1,9 +1,3 @@
-# 区块链电子投票系统 - Python 依赖
-# Blockchain E-Voting System - Python Dependencies
-
-# Web 框架（静态文件服务）
 fastapi==0.109.0
 uvicorn==0.27.0
-
-# 测试
 pytest==8.0.0

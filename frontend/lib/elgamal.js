@@ -1,14 +1,5 @@
 /**
- * BabyJubJub ElGamal 加密库 (浏览器端)
- * ElGamal encryption on BabyJubJub using circomlibjs for curve operations.
- *
- * 依赖: circomlibjs (通过 CDN 或 npm 加载)
- *
- * 使用:
- *   const elgamal = await ElGamalLib.init();
- *   const { sk, pk } = elgamal.generateKeypair();
- *   const ct = elgamal.encrypt(1n, pk);
- *   const m = elgamal.decrypt(ct, sk);
+ * Browser-side ElGamal (BabyJubJub) helpers built on circomlibjs.
  */
 
 const ElGamalLib = (() => {

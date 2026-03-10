@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/**
- * @title IVoteVerifier - ZKP 投票证明验证器接口
- */
 interface IVoteVerifier {
     function verifyProof(
         uint[2] calldata _pA,
@@ -13,9 +10,6 @@ interface IVoteVerifier {
     ) external view returns (bool);
 }
 
-/**
- * @title ITallyVerifier - ZKP 计票证明验证器接口
- */
 interface ITallyVerifier {
     function verifyProof(
         uint[2] calldata _pA,
@@ -25,93 +19,67 @@ interface ITallyVerifier {
     ) external view returns (bool);
 }
 
-/**
- * @title Voting - ZKP 零知识证明投票合约（含选民注册）
- * @notice 管理单场选举：选民注册、投票提交（含 ZKP 证明）和结果统计（含计票证明）
- * @dev 使用 ElGamal on BabyJubJub 同态加密 + Groth16 零知识证明
- *      - ZKP1+ZKP2: 选票合法性 + 承诺-密文一致性（投票时验证）
- *      - ZKP3: 解密正确性（计票时验证）
- */
 contract Voting {
     // ============ 状态变量 ============
 
-    /// @notice 合约管理员
     address public admin;
 
-    /// @notice ZKP 投票验证器合约
     address public voteVerifier;
 
-    /// @notice ZKP 计票验证器合约
     address public tallyVerifier;
 
-    /// @notice 选举状态枚举
     enum ElectionStatus {
-        Created,    // 已创建，可添加候选人
-        Active,     // 进行中，可投票
-        Ended,      // 已结束，等待计票
-        Tallied     // 已计票
+        Created,
+        Active,
+        Ended,
+        Tallied
     }
 
-    /// @notice 当前选举状态
     ElectionStatus public status;
 
-    /// @notice 选举标题
     string public title;
 
-    /// @notice 选举描述
     string public description;
 
-    /// @notice 候选人数量
     uint256 public candidateCount;
 
-    /// @notice 总投票数
     uint256 public totalVotes;
     uint256 public constant CIRCUIT_CANDIDATE_COUNT = 2;
     uint256 public constant ENCRYPTED_SLOT_WIDTH = 4;
 
-    /// @notice 已注册选民总数
     uint256 public totalVoters;
 
-    /// @notice Merkle 根哈希
     bytes32 public merkleRoot;
 
-    /// @notice ElGamal 公钥 (BabyJubJub 点)
     uint256[2] public elgamalPK;
 
-    /// @notice 候选人结构体
     struct Candidate {
-        uint256 id;         // 候选人ID
-        string name;        // 候选人名称
-        uint256 voteCount;  // 得票数
+        uint256 id;
+        string name;
+        uint256 voteCount;
     }
 
-    /// @notice 选民信息结构体
     struct Voter {
-        bool isRegistered;      // 是否已注册
-        bool hasVoted;          // 是否已投票
-        uint256 registeredAt;   // 注册时间戳
+        bool isRegistered;
+        bool hasVoted;
+        uint256 registeredAt;
     }
 
-    /// @notice 投票记录结构体
     struct VoteRecord {
-        bytes32 commitment;       // Poseidon(candidateId, salt) 承诺
-        bytes32 ciphertextHash;   // Poseidon(所有密文分量) 绑定哈希
-        uint256 timestamp;        // 投票时间
-        bool counted;             // 是否已计入结果
+        bytes32 commitment;
+        bytes32 ciphertextHash;
+        uint256 timestamp;
+        bool counted;
     }
 
     // ============ 映射 ============
 
-    /// @notice 候选人ID => 候选人信息
     mapping(uint256 => Candidate) public candidates;
 
-    /// @notice 选民地址 => 选民信息
     mapping(address => Voter) public voters;
 
-    /// @notice 选民地址 => 投票记录
     mapping(address => VoteRecord) public voteRecords;
 
-    /// @notice 所有投票承诺数组
     bytes32[] public commitments;
     uint256[2] public tallyResultPointX;
     uint256[2] public tallyResultPointY;
@@ -147,14 +115,6 @@ contract Voting {
 
     // ============ 构造函数 ============
 
-    /**
-     * @notice 部署并初始化选举
-     * @param _title 选举标题
-     * @param _description 选举描述
-     * @param _voteVerifier ZKP 投票验证器合约地址
-     * @param _tallyVerifier ZKP 计票验证器合约地址
-     * @param _elgamalPK ElGamal 公钥 [pkX, pkY] (BabyJubJub 点)
-     */
     constructor(
         string memory _title,
         string memory _description,
@@ -178,10 +138,6 @@ contract Voting {
 
     // ============ 选民注册函数 ============
 
-    /**
-     * @notice 注册单个选民
-     * @param _voter 选民钱包地址
-     */
     function registerVoter(address _voter) external onlyAdmin {
         require(_voter != address(0), "Voting: invalid address");
         require(!voters[_voter].isRegistered, "Voting: already registered");
@@ -195,10 +151,6 @@ contract Voting {
         emit VoterRegistered(_voter, block.timestamp);
     }
 
-    /**
-     * @notice 批量注册选民
-     * @param _voters 选民地址数组
-     */
     function registerVotersBatch(address[] calldata _voters) external onlyAdmin {
         for (uint256 i = 0; i < _voters.length; i++) {
             address voter = _voters[i];
@@ -216,10 +168,6 @@ contract Voting {
 
     // ============ 选举管理函数 ============
 
-    /**
-     * @notice 添加单个候选人（保留用于测试异常场景）
-     * @param _name 候选人名称
-     */
     function addCandidate(string calldata _name) external onlyAdmin inStatus(ElectionStatus.Created) {
         require(candidateCount < CIRCUIT_CANDIDATE_COUNT, "Voting: circuit supports 2 candidates");
         uint256 candidateId = candidateCount++;
@@ -231,11 +179,6 @@ contract Voting {
         emit CandidateAdded(candidateId, _name);
     }
 
-    /**
-     * @notice 一次性添加两位候选人（候选人数量硬编码为 2）
-     * @param _name0 候选人 0 的名称
-     * @param _name1 候选人 1 的名称
-     */
     function addCandidates(string calldata _name0, string calldata _name1) external onlyAdmin inStatus(ElectionStatus.Created) {
         require(candidateCount == 0, "Voting: candidates already added");
         candidates[0] = Candidate({ id: 0, name: _name0, voteCount: 0 });
@@ -245,18 +188,12 @@ contract Voting {
         emit CandidateAdded(1, _name1);
     }
 
-    /**
-     * @notice 启动选举（管理员手动开启）
-     */
     function startElection() external onlyAdmin inStatus(ElectionStatus.Created) {
         require(candidateCount == CIRCUIT_CANDIDATE_COUNT, "Voting: candidate-circuit mismatch");
         status = ElectionStatus.Active;
         emit ElectionStatusChanged(ElectionStatus.Active);
     }
 
-    /**
-     * @notice 结束选举（管理员手动关闭）
-     */
     function endElection() external onlyAdmin inStatus(ElectionStatus.Active) {
         status = ElectionStatus.Ended;
         emit ElectionStatusChanged(ElectionStatus.Ended);
@@ -264,15 +201,6 @@ contract Voting {
 
     // ============ 投票函数 ============
 
-    /**
-     * @notice 提交投票（含 ZKP 证明）
-     * @param _commitment Poseidon(candidateId, salt) 承诺哈希
-     * @param _ciphertextHash Poseidon(所有密文分量) 绑定哈希
-     * @param _pA Groth16 proof point A
-     * @param _pB Groth16 proof point B
-     * @param _pC Groth16 proof point C
-     * @param _encryptedVote 加密投票数据 (emit 到事件日志, 用于链下同态计票)
-     */
     function castVote(
         bytes32 _commitment,
         bytes32 _ciphertextHash,
@@ -282,7 +210,6 @@ contract Voting {
         uint256[] calldata _encryptedVote
     ) external electionActive {
         require(candidateCount == CIRCUIT_CANDIDATE_COUNT, "Voting: candidate-circuit mismatch");
-        // 1. 检查选民资格
         require(voters[msg.sender].isRegistered, "Voting: not registered");
         require(!voters[msg.sender].hasVoted, "Voting: already voted");
         require(_commitment != bytes32(0), "Voting: invalid commitment");
@@ -293,7 +220,6 @@ contract Voting {
             "Voting: invalid encrypted vote length"
         );
 
-        // 2. 验证 ZKP 证明 (ZKP1 + ZKP2)
         uint[4] memory pubSignals;
         pubSignals[0] = uint256(_commitment);
         pubSignals[1] = uint256(_ciphertextHash);
@@ -305,10 +231,8 @@ contract Voting {
             "Voting: invalid ZKP proof"
         );
 
-        // 3. 标记已投票
         voters[msg.sender].hasVoted = true;
 
-        // 4. 记录投票
         voteRecords[msg.sender] = VoteRecord({
             commitment: _commitment,
             ciphertextHash: _ciphertextHash,
@@ -319,20 +243,10 @@ contract Voting {
         commitments.push(_commitment);
         totalVotes++;
 
-        // 5. 发出事件 (密文数据存储在事件日志中，不在存储中)
         emit VoteCast(msg.sender, _commitment, _ciphertextHash);
         emit EncryptedVoteCast(msg.sender, _commitment, _encryptedVote);
     }
 
-    /**
-     * @notice 更新计票结果（管理员调用，含 ZKP3 计票正确性证明）
-     * @param _results 每个候选人的得票数数组
-     * @param _merkleRoot 投票的 Merkle 根哈希
-     * @param _pA Groth16 proof point A (ZKP3)
-     * @param _pB Groth16 proof point B (ZKP3)
-     * @param _pC Groth16 proof point C (ZKP3)
-     * @param _tallyPubSignals ZKP3 公开输入 (15 个 uint256)
-     */
     function updateTallyResults(
         uint256[] calldata _results,
         bytes32 _merkleRoot,
@@ -344,20 +258,16 @@ contract Voting {
         require(candidateCount == CIRCUIT_CANDIDATE_COUNT, "Voting: candidate-circuit mismatch");
         require(_results.length == candidateCount, "Voting: invalid results length");
 
-        // 1. 验证公开输入中的 PK 与合约存储的一致 (先于证明验证, 节省 gas)
         require(_tallyPubSignals[0] == elgamalPK[0], "Voting: PK mismatch X");
         require(_tallyPubSignals[1] == elgamalPK[1], "Voting: PK mismatch Y");
 
-        // 2. 验证总票数 (公开输入最后一个是 totalVotes)
         require(_tallyPubSignals[14] == totalVotes, "Voting: total votes mismatch");
 
-        // 3. 验证 ZKP3 证明 (解密正确性)
         require(
             ITallyVerifier(tallyVerifier).verifyProof(_pA, _pB, _pC, _tallyPubSignals),
             "Voting: invalid tally ZKP proof"
         );
 
-        // 4. 更新候选人得票数
         uint256 totalVotesSum = 0;
         for (uint256 i = 0; i < candidateCount; i++) {
             require(_results[i] <= totalVotes, "Voting: invalid per-candidate result");
@@ -367,7 +277,6 @@ contract Voting {
 
         require(totalVotesSum == totalVotes, "Voting: vote count mismatch");
 
-        // 5. 更新状态
         merkleRoot = _merkleRoot;
         status = ElectionStatus.Tallied;
         tallyResultPointX[0] = _tallyPubSignals[10];
@@ -380,10 +289,6 @@ contract Voting {
         emit ElectionStatusChanged(ElectionStatus.Tallied);
     }
 
-    /**
-     * @notice 更新 Merkle 根
-     * @param _root Merkle 根哈希
-     */
     function updateMerkleRoot(bytes32 _root) external onlyAdmin {
         require(status != ElectionStatus.Tallied, "Voting: merkle root finalized");
         merkleRoot = _root;
@@ -392,23 +297,14 @@ contract Voting {
 
     // ============ 查询函数 ============
 
-    /**
-     * @notice 检查地址是否为已注册选民
-     */
     function isRegistered(address _voter) external view returns (bool) {
         return voters[_voter].isRegistered;
     }
 
-    /**
-     * @notice 检查选民是否已投票
-     */
     function hasVoted(address _voter) external view returns (bool) {
         return voters[_voter].hasVoted;
     }
 
-    /**
-     * @notice 获取选民完整信息
-     */
     function getVoterInfo(address _voter) external view returns (
         bool isReg,
         bool voted,
@@ -418,9 +314,6 @@ contract Voting {
         return (v.isRegistered, v.hasVoted, v.registeredAt);
     }
 
-    /**
-     * @notice 获取选举信息
-     */
     function getElectionInfo() external view returns (
         string memory _title,
         string memory _description,
@@ -431,17 +324,10 @@ contract Voting {
         return (title, description, status, candidateCount, totalVotes);
     }
 
-    /**
-     * @notice 获取 ElGamal 公钥
-     */
     function getElgamalPK() external view returns (uint256[2] memory) {
         return elgamalPK;
     }
 
-    /**
-     * @notice 获取候选人信息
-     * @param _candidateId 候选人ID
-     */
     function getCandidate(uint256 _candidateId) external view returns (
         string memory name,
         uint256 voteCount
@@ -451,10 +337,6 @@ contract Voting {
         return (c.name, c.voteCount);
     }
 
-    /**
-     * @notice 获取选民投票记录
-     * @param _voter 选民地址
-     */
     function getVoteRecord(address _voter) external view returns (
         bytes32 commitment,
         bytes32 ciphertextHash,
@@ -465,16 +347,10 @@ contract Voting {
         return (r.commitment, r.ciphertextHash, r.timestamp, r.counted);
     }
 
-    /**
-     * @notice 获取投票承诺数量
-     */
     function getCommitmentsCount() external view returns (uint256) {
         return commitments.length;
     }
 
-    /**
-     * @notice 获取所有候选人信息
-     */
     function getAllCandidates() external view returns (Candidate[] memory) {
         Candidate[] memory result = new Candidate[](candidateCount);
         for (uint256 i = 0; i < candidateCount; i++) {

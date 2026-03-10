@@ -1,18 +1,7 @@
-"""
-BabyJubJub ElGamal 加密模块
-ElGamal encryption on BabyJubJub curve for ZK-friendly homomorphic voting.
+"""ElGamal encryption on BabyJubJub for homomorphic voting.
 
-BabyJubJub curve: ax² + y² = 1 + dx²y²
-  a = 168700, d = 168696
-  Defined over the BN254 scalar field (Fr)
-  Order ≈ 2^251
-
-This module implements:
-  - BabyJubJub curve arithmetic (point addition, scalar multiplication)
-  - Exponential ElGamal encryption/decryption
-  - Additive homomorphism for vote tallying
-  - Baby-step Giant-step discrete log solver
-  - One-hot vote encoding
+Includes curve arithmetic, exponential ElGamal, homomorphic addition, and a
+baby-step/giant-step discrete-log solver for small plaintexts.
 """
 
 import secrets
