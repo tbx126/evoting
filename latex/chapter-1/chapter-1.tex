@@ -87,27 +87,38 @@ RQ3 & Gap analysis of achieved and outstanding security properties & Chapter 5 (
 \end{table}
 \section{Scope and Boundaries}
 
-The implemented system targets a single-election deployment model with an administrator-controlled tally key. This prototype is a reproducible research demonstrator, not a production platform for national elections.
+This e-voting system is a reproducible research prototype, targeting deployment of a two-candidate election.
 
-Out-of-scope items include coercion resistance, threshold decryption ceremonies, decentralized governance for election administration, and formal verification of contract bytecode. These are addressed as future work rather than claimed as completed features.
+Circuits are compiled and tested for a fixed candidate count of $N = 2$; larger $N$ requires significantly more engineering effort and is not part of this prototype. Voter eligibility relies on an administrator-managed whitelist whose real-world correctness is outside the protocol's cryptographic scope.
+
+\textbf{Trust assumptions.} The prototype assumes a semi-trusted administrator who follows the protocol. The admin keeps the private key safely, gives an honest whitelist, and would not release wrong results since it can be easily identified by the public. For on-chain results, people only need to trust cryptography and no institutional trust is needed.
+
+Out of scope: coercion resistance; threshold key management; decentralized governance; formal contract verification; cross-election voter privacy.
 
 \section{Contributions}
 
-The work produces five concrete outputs:
+Four concrete outputs result from this work:
 \begin{itemize}
-    \item a cross-stack prototype---Solidity contracts, Circom circuits, browser-side JavaScript proving, and Python cryptographic validation---compiled, deployed, and independently testable;
-    \item a vote-submission mechanism binding the Poseidon commitment and ciphertext hash as public proof signals;
-    \item a tally pipeline that runs homomorphic aggregation and ZKP3 verification, then publishes a Merkle root for commitment-set auditability under the implementation assumptions analyzed in Chapter 5;
-    \item a post-election audit path where voters confirm ballot inclusion from a local receipt and an exported bundle, without address-based lookup in the verification step;
-    \item a requirement-driven gap assessment that names unresolved risks explicitly rather than folding them into general limitations.
+    \item a cross-stack prototype spanning Solidity smart contracts, Circom circuits, JavaScript for frontend interaction and cryptographic calculation, and Python for backend serving and validation---compiled, deployed, and independently testable;
+    \item a secure vote-submission mechanism that cryptographically links each ballot's commitment to its encrypted payload, reducing the risk of discrepancies between what is proved and what is submitted;
+    \item a tally pipeline running homomorphic aggregation off-chain, verifying decryption correctness through an on-chain tally proof, and anchoring the result set with a published Merkle root;
+    \item a receipt-based audit path where voters confirm ballot inclusion using a local receipt and an exported bundle, with no address lookup required during verification.
 \end{itemize}
 
 \section{Dissertation Structure}
 
-Chapter 2 surveys prior work and builds the cryptographic foundations the protocol relies on. Chapter 3 then defines the system model, the protocol flow, and the trust assumptions underlying both. Implementation decisions and module-level behaviour are covered in Chapter 4. Chapter 5 reports evaluation outcomes---performance measurements, requirement traceability, and a risk analysis. Chapter 6 concludes and lays out a prioritized hardening roadmap.
+The dissertation is divided into six chapters.
 
-\section{Chapter Summary}
+Chapter 2 reviews previous research and develops the cryptographic foundations on which the protocol is built.
 
-This chapter set out the problem context, pinned down three research questions, and drew the scope boundaries that govern how security claims should be read. The contributions were also stated here; they are validated against implementation and evaluation evidence in later chapters. Chapter 2 positions this work in the broader e-voting and cryptographic literature, then develops the theoretical foundations---Groth16 in particular---that the protocol design in Chapter 3 builds on.
+Chapter 3 sets out the system model and describes the protocol's operation. It also specifies the trust assumptions that have been made.
+
+Implementation is covered in Chapter 4, where the design decisions and the behaviour of each module are examined in detail.
+
+Chapter 5 presents the evaluation results. These include performance measurements, requirement traceability, and a risk analysis.
+
+Chapter 6 summarises the findings and offers a roadmap for future hardening.
+
+Two appendices support the main text: Appendix A provides a guide to reproducing the prototype locally, and Appendix B provides the requirement traceability checklist.
 
 \endgroup
