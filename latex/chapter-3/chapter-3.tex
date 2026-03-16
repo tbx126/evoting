@@ -7,17 +7,9 @@
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
 
-\section{Roles, Assets, and Trust Boundaries}
+\section{Protocol Roles}
 
-The protocol defines three active roles: administrator, registered voter, and public verifier. The main protected assets are ballot confidentiality, result correctness, and audit trace integrity.
-A public verifier is any party that can read blockchain data without credentials: they can observe on-chain state transitions, inspect proof-verification outcomes, and run the audit procedure in Section 3.9 using the published audit bundle.
-
-Trust boundaries are split as follows:
-\begin{itemize}
-    \item \textbf{On-chain boundary}: election state transitions and proof-verification outcomes are publicly observable and tamper-evident.
-    \item \textbf{Client boundary}: ballot construction, witness generation, and receipt storage occur in user-controlled runtime environments.
-    \item \textbf{Administrator boundary}: tally decryption key custody, result submission, and voter-registration whitelist administration remain operationally sensitive; whitelist correctness is controlled unilaterally and cannot be independently verified from on-chain data alone.
-\end{itemize}
+The protocol operates through three active roles. An administrator deploys the contracts at the outset. This actor then maintains the voter whitelist and retains sole possession of the private key that decrypts the final tally. Registration as a voter hinges on one requirement alone: the address must appear on the whitelist. That condition grants the right to submit exactly one ballot. A public verifier is any party that can read blockchain data without credentials: they can observe on-chain state transitions, inspect proof-verification outcomes, and run the audit procedure in Section~3.9 using the published audit bundle. Above all, the system secures ballot confidentiality, guarantees result correctness, and preserves audit trace integrity.
 
 \section{Threat Model}
 
@@ -252,18 +244,6 @@ Election ID & Bundle + receipt metadata & Prevents cross-election replay or acci
 \bottomrule
 \end{tabular}
 \end{table}
-
-\section{Complexity and Scalability Considerations}
-
-For $V$ votes and $N$ candidates:
-\begin{itemize}
-    \item ballot encryption complexity is $O(N)$ per voter;
-    \item vote-proof generation is the dominant per-voter latency (measured at approximately 0.6--1.1 seconds for the current $N=2$ circuit scale in local Node.js evaluation) and is not captured by the $O(N)$ encryption term;
-    \item tally aggregation complexity is $O(VN)$ point additions;
-    \item single inclusion proof verification is $O(\log V)$ hash operations.
-\end{itemize}
-
-While the current implementation is suitable for small-to-medium election sizes in prototype settings, larger deployments require optimization of proof generation latency, event indexing, and key governance.
 
 \section{Chapter Summary}
 
