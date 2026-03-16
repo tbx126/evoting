@@ -23,44 +23,25 @@ This dissertation addresses all four properties at the cryptographic level. Elig
 
 \section{Centralised E-Voting Systems}
 
-Conventional centralised systems handle the full election lifecycle through web services and database transactions. The approach has practical advantages: mature tooling, straightforward deployment, and low operational complexity. Several national deployments have adopted this model at scale.
+Conventional election systems rely on centralised architectures to oversee the complete voting process. Web services and database transactions handle every stage, drawing on mature tooling and seamless deployment options. The approach projects reliability at first glance.
 
-Estonia's internet voting system, operational since 2005, represents the most mature large-scale deployment. Voters authenticate using national identity cards and may revise their ballot multiple times before polling closes. A security audit by Springall et al.\ in 2014 identified server-side vulnerabilities, inconsistent software validation, and an absence of independently verifiable evidence that tallied results matched the cast ballots \cite{springall2014}. The audit concluded that the system's assurances rest primarily on trust in operator infrastructure rather than on publicly verifiable cryptographic guarantees.
+Estonia launched its internet voting platform in 2005. It stands as the most mature and largest-scale example to date. A security audit by Springall et al.\ in 2014 identified server-side vulnerabilities and an absence of independently verifiable evidence that tallied results matched cast ballots \cite{springall2014}. The system's assurances rest primarily on trust in operator infrastructure rather than on publicly verifiable cryptographic guarantees.
 
-Helios, introduced by Adida in 2008, adopts a different philosophy \cite{adida2008}. It publishes encrypted ballots and decryption proofs openly, enabling independent tally verification without trusting the operator's claimed output. Helios has been used in real organisational elections, including internal votes of the International Association for Cryptologic Research. Its trust model, however, still depends on a central server to collect and publish ciphertexts; a compromised server can suppress or substitute ballots before they enter the public record.
+Adida took a different path with Helios in 2008 \cite{adida2008}. His design publishes every encrypted ballot in plain sight, complete with decryption proofs. Observers can verify the final count without accepting the operator's word. Yet the architecture still funnels every ciphertext through a central server before it reaches the public record. A breach at that single point enables ballots to vanish or be replaced undetected.
 
-These examples reveal a structural limitation that centralised architectures cannot resolve through engineering refinement alone:
-\begin{itemize}
-    \item privileged insiders can alter records or logs if access controls fail;
-    \item replaying state transitions independently requires a full data export, which operators may restrict;
-    \item dispute resolution ultimately falls back on institutional trust rather than any independently verifiable record.
-\end{itemize}
-
-The root cause is architectural: all integrity checks operate within the same trust boundary as the operators who control the system. Replacing that boundary with a tamper-evident, publicly verifiable record motivates the turn to blockchain infrastructure.
+These cases share a fundamental flaw. Insiders who manage the infrastructure also oversee the very integrity checks meant to constrain them. When conflicts arise, resolution hinges on institutional assurances rather than any tamper-proof, externally auditable trail. This structural gap propels the examination of blockchain-based ledgers in the next section---ledgers designed to replace opaque boundaries with publicly verifiable, immutable records.
 
 \section{Blockchain-Based Voting Approaches}
 
-Blockchain infrastructures maintain immutable append-only logs with deterministic execution rules \cite{nakamoto2008,wood2014}. Election state transitions and event traces are transparently recorded. Smart contracts enforce lifecycle invariants directly, removing the hidden backend logic that centralised systems rely on.
+Blockchain infrastructures resolve the trust-boundary problem identified in the previous section. They do so through immutable append-only logs governed by deterministic execution rules \cite{nakamoto2008,wood2014}. Smart contracts embed lifecycle invariants directly in code. Centralised platforms lose their favorite refuge: the invisible backend that no outsider can inspect.
 
-Early work on blockchain-based voting focused on demonstrating feasibility rather than resolving privacy. McCorry, Shahandashti, and Hao published the first serious treatment of privacy-preserving smart-contract voting in 2017 \cite{mccorry2017}. Their protocol, implemented on Ethereum, uses public-key encryption to conceal individual ballots and ensures the administrator learns only the aggregate outcome. The scheme requires all voters to be online simultaneously during a commitment phase, however, and verification involves a multi-round interactive protocol. These interaction requirements limit practical applicability for general elections.
+Early research chased demonstrations of possibility more than privacy itself. McCorry et al.\ introduced the first privacy-preserving smart-contract voting protocol in 2017 \cite{mccorry2017}. Public-key encryption shielded individual ballots from view. The design still demanded synchronized participation from every voter. Multiple rounds of interaction followed. Practical deployment never materialized. Hjalmarsson et al.\ later showed that on-chain lifecycle enforcement could work in principle \cite{hjalmarsson2018}. Gas costs quickly became the limiting factor for any sizable electorate. Their prototype left ballot contents exposed in plaintext. Voter secrecy found no protection.
 
-Hjalmarsson et al.\ examined the scalability and deployment characteristics of blockchain e-voting in 2018, implementing a prototype on Ethereum and measuring transaction costs and throughput under realistic conditions \cite{hjalmarsson2018}. Their results confirmed that on-chain lifecycle enforcement is technically feasible, but identified gas costs and block-rate constraints as binding limits for large electorates. Ballot content in their prototype is stored in plaintext, leaving ballot secrecy unresolved.
-
-Transparency cuts both ways. If vote semantics appear in plaintext on-chain, confidentiality is permanently and irrecoverably lost. A privacy-preserving blockchain voting system must therefore pair ledger transparency for control flow with cryptographic concealment for ballot content. Existing proposals address this tension incompletely: systems that encrypt ballots off-chain and submit only ciphertexts still require a trusted party to attest to the decryption without a verifiable proof, so the tally claim rests on operator honesty rather than cryptographic evidence.
-
-The gap is not a missing component but a missing integration: encrypting ballots, proving their validity without revealing their content, proving the correctness of the aggregate decryption, and enabling post-election inclusion auditing must all operate together in a single verifiable pipeline.
+Openness cuts both ways. Place vote details directly on the chain and confidentiality disappears forever. Shifting encryption off-chain helps somewhat. Without rigorous proofs of correct decryption, however, any announced tally still hinges on trusting the operators instead of mathematics. The real shortfall sits in integration. Ballot encryption, validity checks, decryption verification, and post-election audits must bind together into one unbroken, provable sequence. Nothing less will suffice.
 
 \section{Positioning of This Work}
 
-This dissertation addresses that integration gap. It builds and evaluates a complete pipeline connecting browser-side proof generation, smart-contract verification, and post-election audit tooling in one deployable workflow.
-
-The contribution has two concrete parts:
-\begin{itemize}
-    \item a working prototype demonstrating that homomorphic encryption, zero-knowledge proof verification, and Merkle auditability operate together under one architecture;
-    \item an explicit assessment of which security goals are fully met, partially met, or still unresolved, providing a grounded basis for future hardening.
-\end{itemize}
-
-Table~\ref{tab:approach-comparison} summarises the most relevant architectural tradeoffs across the three categories of system examined in this chapter.
+This dissertation addresses that integration gap directly. Rather than treating encryption, proof verification, and auditability components separately, it builds and evaluates a complete pipeline. Ballots undergo encryption directly on the client device. Groth16 zero-knowledge proofs then validate their semantic correctness on-chain. A separate cryptographic argument establishes the soundness of aggregate decryption without disclosing the underlying secret key. Voters can independently confirm inclusion through Merkle-based receipts. Table~\ref{tab:approach-comparison} summarises the architectural differences across the three approaches.
 
 \begin{table}[htbp]
 \centering
@@ -80,15 +61,15 @@ Operational complexity & Lower & Moderate & Higher, but with stronger assurance 
 \end{tabular}
 \end{table}
 
-The following sections develop the cryptographic mechanisms that underpin this integration.
-
 \section{Homomorphic Encryption for Private Tally}
 
-Two principal homomorphic encryption schemes appear in e-voting literature. Paillier encryption \cite{paillier1999} supports additive homomorphism over integer plaintexts directly, without point encoding, and has been adopted in systems such as Helios \cite{adida2008}. Its ciphertext arithmetic operates modulo a composite integer, however, which does not map efficiently to the finite-field arithmetic that zk-SNARK circuits require. Embedding Paillier operations inside a Groth16 circuit would require non-native field arithmetic, substantially increasing constraint counts.
+Paillier encryption \cite{paillier1999} recurs throughout electronic voting literature. The scheme adds integers directly without any encoding step. Helios \cite{adida2008} embraced it for precisely this reason. Its arithmetic nevertheless encounters a fundamental mismatch. Ciphertexts compute modulo a composite integer. zk-SNARK circuits instead require pure finite-field operations. Embedding the Paillier scheme inside a Groth16 circuit therefore calls for non-native field arithmetic. The resulting constraint count rises sharply.
 
-ElGamal encryption on elliptic-curve discrete-log groups supports additive homomorphism over encoded messages \cite{elgamal1985,hankerson2004ecc}. This work instantiates ElGamal on BabyJubJub \cite{eip2494}, which is defined over the BN254 scalar field and therefore admits native arithmetic in Groth16 circuits without field-conversion overhead. Each ballot is encoded as a one-hot vector; component-wise aggregation of ciphertexts gives encrypted candidate totals. Decrypting only the aggregates avoids exposing individual ballots.
+ElGamal encryption offers a more compatible alternative. On elliptic-curve discrete-logarithm groups it supports additive homomorphism over encoded messages \cite{elgamal1985,hankerson2004ecc}. This work deploys the scheme on BabyJubJub \cite{eip2494}. The curve is defined over the BN254 scalar field. Native arithmetic in Groth16 circuits follows directly. No field conversion overhead materializes.
 
-Two practical advantages follow. Ciphertext aggregation scales linearly with vote count using simple point additions; recovering final integer totals from decrypted points is a separate off-chain discrete-log step. Privacy holds as long as secret-key exposure and plaintext side channels stay controlled---a weaker guarantee than threshold decryption, but achievable without ceremony infrastructure.
+Each ballot takes the form of a one-hot vector. Component-wise aggregation of ciphertexts produces the encrypted candidate totals. Decryption applies exclusively to these aggregates. Individual ballots thus stay concealed. Aggregation scales linearly with the number of votes. It relies on nothing more than point additions. The final step of extracting integer counts from decrypted points moves off-chain to a discrete logarithm calculation.
+
+Privacy holds provided the secret key remains uncompromised and plaintext side channels are controlled. This guarantee is weaker than threshold decryption, which tolerates partial key compromise, but requires no distributed key generation ceremony.
 
 \section{Zero-Knowledge Proofs in Voting}
 
