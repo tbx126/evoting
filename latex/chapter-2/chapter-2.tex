@@ -7,41 +7,47 @@
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
 
-This chapter surveys related prior work on e-voting systems and analyzes the details of the cryptographic foundations adopted in this prototype.
+This chapter establishes the context and technical foundations for the prototype developed in this dissertation. It serves two purposes: first, to survey the existing landscape of electronic voting systems and identify the gap that motivates the present work; second, to introduce the cryptographic building blocks that the implementation combines into a single verifiable pipeline.
 
-It opens by defining the security requirements all reliable e-voting systems should satisfy. Centralised architectures suffer from inherent single points of failure and problematic trust assumptions. Purely blockchain-based systems address transparency but leave the privacy--verifiability gap unresolved. This dissertation positions itself at the intersection of these two extremes.
-
-This chapter then introduces the main cryptographic constructions utilized in the implementation: ElGamal homomorphic encryption instantiated over BabyJubJub, Groth16 zero-knowledge proofs, and commitment-based Merkle trees that support efficient auditability.
+Sections~2.1--2.4 define the security requirements that a trustworthy e-voting system must satisfy, review representative centralised and blockchain-based approaches against those requirements, and position this dissertation at the intersection of their respective strengths. Sections~2.5--2.7 then develop the three cryptographic constructions adopted in the implementation---ElGamal homomorphic encryption on the BabyJubJub curve, Groth16 zero-knowledge proofs, and commitment-based Merkle trees---providing the formal detail needed to understand the protocol design in Chapter~3 and the implementation decisions in Chapter~4.
 
 \section{Security Requirements of E-Voting}
 
-Any trustworthy e-voting system must satisfy four essential security requirements: eligibility control, ballot secrecy, individual verifiability, and universal verifiability.
+The electronic voting literature identifies four essential security requirements that any trustworthy system must satisfy \cite{benaloh1994,chaum2004}.
 
-Eligibility means only authorised voters can cast a vote and can only vote once. Ballot secrecy requires that no entity, including the administrator, be able to reveal any specific ballot. Individual verifiability allows every voter to verify if their own ballot was correctly counted. Universal verifiability means that any third-party observer may check whether the published result matches the set of cast ballots.
+\textit{Eligibility control} ensures that only authorised voters may cast a ballot and that each voter can vote at most once. Without robust eligibility enforcement, the tally can be corrupted by duplicate or unauthorised submissions regardless of any downstream cryptographic protection.
 
-This dissertation addresses all four properties at the cryptographic level. Eligibility is enforced through an on-chain voter whitelist registry. Homomorphic encryption is adopted to achieve ballot secrecy, so that plaintext choices are never stored. Individual verifiability is provided by receipt-based Merkle inclusion proofs. Universal verifiability is enabled through on-chain Groth16 zero-knowledge proof verification of both vote validity and tally correctness.
+\textit{Ballot secrecy} requires that no entity---including the election administrator---can determine the content of any individual ballot. This property must hold during submission, while ballots reside in storage, and throughout the tallying process. Ballot secrecy is a precondition for resistance to vote buying and coercion, although full coercion resistance requires additional mechanisms beyond the scope of this work \cite{juels2005}.
+
+\textit{Individual verifiability} enables each voter to confirm that their own ballot was correctly recorded and included in the final tally, typically through a receipt or proof of inclusion that does not compromise ballot secrecy.
+
+\textit{Universal verifiability} allows any third-party observer to check whether the published result is consistent with the set of validly cast ballots, without requiring privileged access to backend systems or secret key material.
+
+This dissertation targets all four properties at the protocol level: eligibility is enforced through an on-chain voter whitelist with one-vote-per-address guards; ballot secrecy is maintained through ElGamal encryption so that plaintext choices never appear on-chain; individual verifiability is provided by receipt-based Merkle inclusion proofs; and universal verifiability is supported through on-chain Groth16 zero-knowledge proof verification of both vote validity and tally correctness. The extent to which each property is fully realised, including residual binding gaps, is assessed in Chapter~5.
 
 \section{Centralised E-Voting Systems}
 
-Conventional election systems rely on centralised architectures to oversee the complete voting process. Web services and database transactions handle every stage, drawing on mature tooling and seamless deployment options. The approach projects reliability at first glance.
+Conventional electronic voting systems rely on centralised architectures in which a single organisational entity manages the complete election process. Such architectures benefit from mature software tooling, established deployment practices, and straightforward operational models. However, they concentrate the entire basis of trust in the backend operators.
 
-Estonia launched its internet voting platform in 2005. It stands as the most mature and largest-scale example to date. A security audit by Springall et al.\ in 2014 identified server-side vulnerabilities and an absence of independently verifiable evidence that tallied results matched cast ballots \cite{springall2014}. The system's assurances rest primarily on trust in operator infrastructure rather than on publicly verifiable cryptographic guarantees.
+Estonia launched its internet voting platform in 2005, establishing the most mature and largest-scale deployed example to date. A subsequent security audit by Springall et al.\ in 2014 identified server-side vulnerabilities and, more fundamentally, an absence of independently verifiable evidence that the tallied results faithfully reflected the cast ballots \cite{springall2014}. The system's assurances rest primarily on trust in the operator infrastructure rather than on publicly verifiable cryptographic guarantees.
 
-Adida took a different path with Helios in 2008 \cite{adida2008}. His design publishes every encrypted ballot in plain sight, complete with decryption proofs. Observers can verify the final count without accepting the operator's word. Yet the architecture still funnels every ciphertext through a central server before it reaches the public record. A breach at that single point enables ballots to vanish or be replaced undetected.
+Adida proposed an alternative approach with Helios in 2008 \cite{adida2008}. The Helios design publishes every encrypted ballot together with decryption proofs, enabling observers to verify the final count without relying solely on the operator's claims. Nevertheless, the architecture routes all ciphertexts through a central server before they reach the public record. A compromise at that single point could allow ballots to be suppressed or substituted without detection.
 
-These cases share a fundamental flaw. Insiders who manage the infrastructure also oversee the very integrity checks meant to constrain them. When conflicts arise, resolution hinges on institutional assurances rather than any tamper-proof, externally auditable trail. This structural gap propels the examination of blockchain-based ledgers in the next section---ledgers designed to replace opaque boundaries with publicly verifiable, immutable records.
+These two representative systems illustrate a recurring structural limitation of centralised e-voting: the entity that operates the infrastructure also governs the integrity mechanisms intended to constrain it. When disputes arise, resolution depends on institutional assurances rather than on a tamper-evident, externally auditable trail. This limitation motivates the examination of blockchain-based alternatives in the following section.
 
 \section{Blockchain-Based Voting Approaches}
 
-Blockchain infrastructures resolve the trust-boundary problem identified in the previous section. They do so through immutable append-only logs governed by deterministic execution rules \cite{nakamoto2008,wood2014}. Smart contracts embed lifecycle invariants directly in code. Centralised platforms lose their favorite refuge: the invisible backend that no outsider can inspect.
+Blockchain platforms address the trust-boundary problem identified above by providing immutable, append-only ledgers governed by deterministic execution rules \cite{nakamoto2008,wood2014}. Smart contracts encode lifecycle invariants directly in publicly auditable code, removing the opaque backend that characterises centralised architectures.
 
-Early research chased demonstrations of possibility more than privacy itself. McCorry et al.\ introduced the first privacy-preserving smart-contract voting protocol in 2017 \cite{mccorry2017}. Public-key encryption shielded individual ballots from view. The design still demanded synchronized participation from every voter. Multiple rounds of interaction followed. Practical deployment never materialized. Hjalmarsson et al.\ later showed that on-chain lifecycle enforcement could work in principle \cite{hjalmarsson2018}. Gas costs quickly became the limiting factor for any sizable electorate. Their prototype left ballot contents exposed in plaintext. Voter secrecy found no protection.
+Early research in this area focused primarily on demonstrating feasibility. McCorry et al.\ introduced the first privacy-preserving smart-contract voting protocol in 2017 \cite{mccorry2017}. Their design employed public-key encryption to shield individual ballots; however, it required synchronised, multi-round participation from every voter, which limited practical deployability. Hjalmarsson et al.\ subsequently demonstrated that on-chain lifecycle enforcement was viable in principle \cite{hjalmarsson2018}, but their prototype stored ballot contents in plaintext and incurred gas costs that scaled prohibitively with electorate size.
 
-Openness cuts both ways. Place vote details directly on the chain and confidentiality disappears forever. Shifting encryption off-chain helps somewhat. Without rigorous proofs of correct decryption, however, any announced tally still hinges on trusting the operators instead of mathematics. The real shortfall sits in integration. Ballot encryption, validity checks, decryption verification, and post-election audits must bind together into one unbroken, provable sequence. Nothing less will suffice.
+These studies reveal a persistent gap in blockchain-based voting. Placing unencrypted vote data on an immutable ledger permanently compromises confidentiality. Applying encryption restores privacy, but without rigorous cryptographic proofs of correct decryption, the announced tally still depends on trusting the decrypting party. The fundamental challenge is one of integration: ballot encryption, validity verification, decryption correctness, and post-election auditability must be bound together in a single, end-to-end verifiable pipeline.
 
 \section{Positioning of This Work}
 
-This dissertation addresses that integration gap directly. Rather than treating encryption, proof verification, and auditability components separately, it builds and evaluates a complete pipeline. Ballots undergo encryption directly on the client device. Groth16 zero-knowledge proofs then validate their semantic correctness on-chain. A separate cryptographic argument establishes the soundness of aggregate decryption without disclosing the underlying secret key. Voters can independently confirm inclusion through Merkle-based receipts. Table~\ref{tab:approach-comparison} summarises the architectural differences across the three approaches.
+This dissertation addresses the integration gap identified above. Rather than treating encryption, proof verification, and auditability as separate components, it designs and evaluates a complete pipeline in which these mechanisms are cryptographically linked. Ballots are encrypted on the client device using ElGamal homomorphic encryption. Groth16 zero-knowledge proofs validate ballot well-formedness on-chain without revealing the voter's choice. A separate zero-knowledge proof establishes the correctness of the aggregate decryption without disclosing the secret key. Voters can independently confirm their ballot's inclusion through Merkle-based receipts that require no address-based lookup during verification.
+
+Table~\ref{tab:approach-comparison} summarises the architectural differences across the three approaches discussed in this chapter.
 
 \begin{table}[htbp]
 \centering
@@ -50,13 +56,13 @@ This dissertation addresses that integration gap directly. Rather than treating 
 \label{tab:approach-comparison}
 \begin{tabular}{L{3.0cm} L{2.9cm} L{2.9cm} L{3.9cm}}
 \toprule
-Criterion & Centralised E-Voting & Blockchain-Only Voting & This Work (Blockchain + HE + ZKP + Merkle) \\
+Criterion & Centralised E-Voting \cite{springall2014,adida2008} & Blockchain-Only Voting \cite{mccorry2017,hjalmarsson2018} & This Work (Blockchain + HE + ZKP + Merkle) \\
 \midrule
-State transparency & Limited by operator logs & High for on-chain actions & High for control flow and published commitments \\
-Ballot confidentiality & Depends on backend policy & Usually weak if plaintext on-chain & Stronger via encrypted ballots and commitment receipts \\
-Tally verifiability & Operational trust heavy & Moderate unless cryptographic proofs added & High through explicit vote/tally proofs \\
-Voter-side inclusion check & Rare or account-linked & Possible but privacy-sensitive & Receipt-based Merkle inclusion workflow with reduced address-linkage during verification \\
-Operational complexity & Lower & Moderate & Higher, but with stronger assurance properties \\
+State transparency & Limited to operator-controlled logs & High for on-chain actions & High for lifecycle control flow and published commitments \\
+Ballot confidentiality & Depends on backend access policy & Weak if ballots stored in plaintext on-chain & ElGamal-encrypted ballots; only commitments and ciphertext hashes stored on-chain \\
+Tally verifiability & Relies on operational trust & Moderate unless cryptographic proofs are added & Groth16 proofs for both vote validity and tally correctness \\
+Voter-side inclusion check & Rare, or requires account-linked queries & Possible but may expose voter address & Receipt-based Merkle inclusion with no address lookup during verification \\
+Operational complexity & Lower & Moderate & Higher, with correspondingly stronger assurance properties \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -195,15 +201,19 @@ where $k$ is the number of pairing pairs. The Groth16 verification equation requ
 
 \subsection{Implementation Pipeline}
 
-The implementation follows a four-stage workflow:
+Translating an abstract proof relation into a deployable on-chain verifier involves four stages, each of which introduces specific artefacts and trust considerations.
+
 \begin{enumerate}
-    \item \textbf{Circuit specification}: constraints are written in circom using library templates for BabyJubJub arithmetic, Poseidon hashing, and conditional logic. The compiler outputs \texttt{.r1cs} (constraint matrices $A, B, C$) and a WASM witness generator.
-    \item \textbf{Trusted setup}: the Powers of Tau artifact (\texttt{pot16\_final.ptau}) provides a universal SRS supporting up to $2^{16}$ constraints. Circuit-specific phase-2 setup uses snarkjs to specialize the SRS to the particular R1CS, producing the proving key (\texttt{.zkey} file, about 7--10 MB per circuit in this implementation).
-    \item \textbf{Proof generation}: given public inputs and private witnesses, the WASM generator constructs the full witness vector $\mathbf{s}$; snarkjs then computes $(\pi_A, \pi_B, \pi_C)$ using the proving key. In the current repository revision, local Node.js measurements place vote-proof generation at approximately 0.6--1.1 seconds for the instantiated $N=2$ circuit, while browser-side snarkjs WASM execution is typically similar or moderately slower depending on device hardware and caching behavior.
-    \item \textbf{Verifier export}: snarkjs generates a Solidity contract that hard-codes the verification key and implements the pairing-check equation as direct EVM precompile calls, eliminating runtime parsing overhead.
+    \item \textbf{Circuit specification.} The prover's relation $\mathcal{R}$ is expressed as an arithmetic circuit written in the Circom domain-specific language \cite{circomdocs}. Library templates from circomlib supply reusable components for BabyJubJub point arithmetic, Poseidon hashing, range checks, and conditional logic. The Circom compiler transforms the high-level description into two outputs: an \texttt{.r1cs} file encoding the constraint matrices $(A, B, C)$ and a WebAssembly (WASM) witness generator that, given concrete inputs, computes the full witness vector $\mathbf{s}$.
+
+    \item \textbf{Trusted setup.} The Groth16 proving system requires a circuit-specific structured reference string (SRS). Construction proceeds in two phases. Phase~1 uses a universal Powers of Tau ceremony artefact (\texttt{pot16\_final.ptau}), which supports circuits of up to $2^{16}$ constraints and whose security rests on the assumption that at least one ceremony participant destroyed their toxic waste. Phase~2 specialises the universal parameters to the particular R1CS via snarkjs, producing a circuit-specific proving key (\texttt{.zkey} file, approximately 7--10\,MB per circuit in this implementation). The corresponding verification key is extracted from the same \texttt{.zkey} and embedded into the Solidity verifier contract generated in Stage~4.
+
+    \item \textbf{Proof generation.} At proving time the WASM witness generator constructs $\mathbf{s}$ from the public inputs and private witnesses; snarkjs then evaluates the QAP polynomials at the secret evaluation point encoded in the proving key and computes the three-element proof $(\pi_A, \pi_B, \pi_C)$. In local Node.js benchmarks for the instantiated $N{=}2$ circuits, vote-proof generation takes approximately 0.6--1.1\,s; browser-side WASM execution exhibits comparable latency, with moderate variation depending on device hardware and caching behaviour. Chapter~5 reports detailed measurements.
+
+    \item \textbf{Verifier export.} Finally, snarkjs generates a self-contained Solidity contract that hard-codes the verification key constants and implements the pairing-check equation (Equation~2.6) as direct calls to the EVM BN254 precompiles, thereby eliminating any runtime parsing or key-loading overhead.
 \end{enumerate}
 
-A key trust property of this pipeline is that the \emph{circuit code is public}: anyone can read \texttt{vote\_proof.circom} and \texttt{tally\_proof.circom}, recompile them, and verify that the resulting R1CS matches the corresponding \texttt{.zkey} artifacts when those artifacts are published with the deployment. This auditability---combined with the verifiable Powers of Tau ceremony transcript---means that trust in the system rests on the cryptographic hardness assumptions and the setup ceremony, not on the circuit author's integrity.
+A key trust property of the resulting pipeline is that the \emph{circuit source code is public}. Any observer can read \texttt{vote\_proof.circom} and \texttt{tally\_proof.circom}, recompile them, and verify that the resulting R1CS matches the \texttt{.zkey} artefacts published alongside the deployment. Combined with the verifiable transcript of the Powers of Tau ceremony, this auditability ensures that trust in the system rests on the underlying cryptographic hardness assumptions and the integrity of the setup ceremony, rather than on the circuit author.
 
 \subsection{ZKP Role in This Dissertation}
 
@@ -218,10 +228,12 @@ The on-chain verifier contracts (\texttt{VoteVerifier.sol}, \texttt{TallyVerifie
 
 \section{Commitments, Hashing, and Merkle Auditability}
 
-A commitment scheme provides a binding, hiding receipt for hidden ballot data. The voter hashes a candidate ID and a random salt, publishing only the resulting digest; any subsequent change to either value would alter the digest, preventing silent tampering. Poseidon is used for this step because it maps efficiently to arithmetic constraints in zk circuits \cite{poseidon2021}---a practical necessity, since the same hash must be verified inside proof generation.
+A commitment scheme provides a binding, hiding digest of secret ballot data. In this system, the voter computes $\mathit{commitment} = \mathsf{Poseidon}(\mathit{candidateId}, \mathit{salt})$, where $\mathit{salt}$ is a fresh random value, and publishes only the resulting digest on-chain. The binding property ensures that any subsequent change to either input would produce a different digest, preventing silent ballot tampering after submission. Poseidon is selected for this role because its algebraic structure maps efficiently to arithmetic constraints in zk-SNARK circuits \cite{poseidon2021}---a practical necessity, since the same commitment must be recomputed and verified inside the vote-proof circuit (ZKP1).
 
-Auditability is then lifted from single commitments to the full ballot set through a Merkle tree \cite{merkle1988}. Each leaf stores one commitment, while the root commits to the entire ordered list. Inclusion proofs grow logarithmically with the number of leaves, which keeps verification cost manageable even as participation scales.
+Auditability is then extended from individual commitments to the entire ballot set through a binary Merkle tree \cite{merkle1988}. Each leaf stores one commitment, and the root value commits to the complete ordered sequence. Inclusion proofs grow logarithmically with the number of leaves ($O(\log V)$ sibling hashes per proof), keeping verification cost manageable even as participation scales to large electorates. The tree construction follows a deterministic ordering rule (sorted by block number, transaction index, and log index) to ensure that any party reconstructing the tree from the same event data arrives at the same root.
 
-This gives two independent checks. A voter can verify that their own commitment is included under the published root without exposing additional identity information in the verification step. Separately, an external auditor can recompute the root from published entries under a deterministic ordering rule and compare it against both the announced root and the on-chain root value. Together, ElGamal homomorphic encryption, Groth16 zero-knowledge proofs, and Merkle-based commitment auditability enable a pipeline in which ballot validity and tally correctness are publicly verifiable without exposing any ballot content. Chapter~3 translates these foundations into a formal protocol model, specifying the system roles, threat assumptions, and end-to-end workflow that the implementation in Chapter~4 realises.
+This design enables two independent verification checks. First, a voter can confirm that their own commitment is included under the published root by presenting a local receipt together with the corresponding Merkle inclusion proof, without exposing additional identity information during the verification step. Second, an external auditor can independently reconstruct the tree from published event data and compare the recomputed root against the on-chain \texttt{merkleRoot} to verify the integrity of the full ballot set.
+
+Together, ElGamal homomorphic encryption, Groth16 zero-knowledge proofs, and Merkle-based commitment auditability form a pipeline in which ballot validity and tally correctness are publicly verifiable without exposing any ballot content. Chapter~3 translates these foundations into a formal protocol model, specifying the system roles, threat assumptions, and end-to-end workflow that the implementation in Chapter~4 realises.
 
 \endgroup
