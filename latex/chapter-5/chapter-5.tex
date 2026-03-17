@@ -74,7 +74,7 @@ Python cryptography unit tests & 43/43 & 27.59 s & \texttt{python -m pytest test
 
 Both suites completed with zero failures, for a combined 76 passing tests. This does not prove security in adversarial deployment, but it gives strong evidence that the implementation claims in Chapters 3--4 are executable and internally consistent on a fresh local run.
 
-Table \ref{tab:evaluation-scenarios} provides a scenario-oriented view of what was validated and what evidence was observed.
+Table~\ref{tab:evaluation-scenarios} provides a scenario-oriented view of what was validated and what evidence was observed.
 
 \begin{table}[htbp]
 \centering
@@ -114,7 +114,7 @@ This section reports quantitative measurements of the system's on-chain gas cons
 
 \subsection{Circuit Complexity}
 
-Table \ref{tab:circuit-complexity} summarizes the R1CS constraint systems produced by a fresh local Circom recompilation of the current repository revision. These values were extracted from the generated \texttt{.r1cs} files using \texttt{snarkjs r1cs info}.
+Table~\ref{tab:circuit-complexity} summarizes the R1CS constraint systems produced by a fresh local Circom recompilation of the current repository revision. These values were extracted from the generated \texttt{.r1cs} files using \texttt{snarkjs r1cs info}.
 
 \begin{table}[htbp]
 \centering
@@ -135,7 +135,7 @@ Both circuits operate on the BN254 (also referred to as BN128) curve. The vote p
 
 \subsection{Client-Side Artifact Footprint}
 
-Proof generation in the browser requires downloading WASM witness generators and proving key files. Table \ref{tab:artifact-sizes} reports the sizes of artifacts that must be loaded on the client side.
+Proof generation in the browser requires downloading WASM witness generators and proving key files. Table~\ref{tab:artifact-sizes} reports the sizes of artifacts that must be loaded on the client side.
 
 \begin{table}[htbp]
 \centering
@@ -162,7 +162,7 @@ For a voter casting a ballot, the browser must load approximately 10.06~MiB of p
 
 Gas costs are central to evaluating blockchain-based protocol feasibility. Groth16 proof verification dominates the on-chain cost due to the \texttt{ecPairing} precompile, which on EVM costs $45{,}000 + 34{,}000 \times k$ gas for $k$ pairing checks (Groth16 uses $k = 4$, yielding 181{,}000 gas for the pairing alone).
 
-Table \ref{tab:gas-costs} reports measured gas consumption from transaction receipts in a fresh local Hardhat run against the current repository revision. The dominant cost components are interpreted with reference to EIP-1108 precompile costs \cite{eip1108} and the storage-access behavior of \texttt{Voting.sol}.
+Table~\ref{tab:gas-costs} reports measured gas consumption from transaction receipts in a fresh local Hardhat run against the current repository revision. The dominant cost components are interpreted with reference to EIP-1108 precompile costs \cite{eip1108} and the storage-access behavior of \texttt{Voting.sol}.
 
 \begin{table}[htbp]
 \centering
@@ -193,7 +193,7 @@ These times are acceptable for a prototype where voters submit one ballot per el
 
 \subsection{Contract Bytecode Size}
 
-Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170 \cite{eip170}). Table \ref{tab:bytecode-sizes} confirms that all contracts remain well within this limit.
+Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170 \cite{eip170}). Table~\ref{tab:bytecode-sizes} confirms that all contracts remain well within this limit.
 
 \begin{table}[htbp]
 \centering
@@ -224,7 +224,7 @@ The system's scalability characteristics vary by component. On-chain gas per vot
     \item \textbf{Circuit constraint scaling}: constraint growth is approximately linear in $N$ for the per-candidate ElGamal sub-circuits, but exact totals require recompilation for each target $N$. Therefore, values beyond $N=2$ in this dissertation are treated as extrapolative rather than measured. In addition, straightforward scaling in the current vote-circuit layout is bounded by the ciphertext-hash arity (\texttt{Poseidon(4N)}), so larger-$N$ support requires circuit-level hash-layout refactoring before claiming concrete higher-$N$ counts.
 \end{itemize}
 
-Table \ref{tab:scalability-summary} summarizes the scaling profile.
+Table~\ref{tab:scalability-summary} summarizes the scaling profile.
 
 \begin{table}[htbp]
 \centering
@@ -267,7 +267,7 @@ Using local receipt material, the voter client recomputes the commitment, locate
 
 \section{Requirement Completion and Traceability}
 
-Table \ref{tab:reqtrace} maps finer-grained requirements to concrete evidence.
+Table~\ref{tab:reqtrace} maps finer-grained requirements to concrete evidence.
 
 \begin{table}[htbp]
 \centering
@@ -293,7 +293,7 @@ Production readiness & Not completed & Several hardening tasks remain (Section 5
 
 \section{Security Analysis}
 
-Figure \ref{fig:threat-model} summarizes the threat surface considered in this dissertation and the primary control layers used by the implementation.
+Figure~\ref{fig:threat-model} summarizes the threat surface considered in this dissertation and the primary control layers used by the implementation.
 
 \begin{figure}[htbp]
 \centering
@@ -349,7 +349,7 @@ Code review identified three remaining gaps that affect full assurance. Gaps are
 
 These issues do not invalidate the prototype's educational value or end-to-end demonstration, but they prevent claiming full compliance with ``fully functional'' in a high-assurance sense.
 
-Figure \ref{fig:assurance-gap} illustrates the current assurance profile: strong functional completeness, but a smaller unresolved hardening segment that must be closed before production use.
+Figure~\ref{fig:assurance-gap} illustrates the current assurance profile: strong functional completeness, but a smaller unresolved hardening segment that must be closed before production use.
 
 \begin{figure}[htbp]
 \centering

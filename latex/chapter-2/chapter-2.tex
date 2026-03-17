@@ -7,7 +7,7 @@
 \titlespacing{\chapter}{0pt}{0pt}{0pt}
 \titlespacing{\section}{0pt}{0pt}{0pt}
 
-Chapter~2 surveys related prior work on e-voting systems and analyzes the details of the cryptographic foundations adopted in this prototype.
+This chapter surveys related prior work on e-voting systems and analyzes the details of the cryptographic foundations adopted in this prototype.
 
 It opens by defining the security requirements all reliable e-voting systems should satisfy. Centralised architectures suffer from inherent single points of failure and problematic trust assumptions. Purely blockchain-based systems address transparency but leave the privacy--verifiability gap unresolved. This dissertation positions itself at the intersection of these two extremes.
 
@@ -17,7 +17,7 @@ This chapter then introduces the main cryptographic constructions utilized in th
 
 Any trustworthy e-voting system must satisfy four essential security requirements: eligibility control, ballot secrecy, individual verifiability, and universal verifiability.
 
-Eligibility means only authorized voters can cast a vote and can only vote once. Ballot secrecy requires that no entity, including the administrator, be able to reveal any specific ballot. Individual verifiability allows every voter to verify if their own ballot was correctly counted. Universal verifiability means that any third-party observer may check whether the published result matches the set of cast ballots.
+Eligibility means only authorised voters can cast a vote and can only vote once. Ballot secrecy requires that no entity, including the administrator, be able to reveal any specific ballot. Individual verifiability allows every voter to verify if their own ballot was correctly counted. Universal verifiability means that any third-party observer may check whether the published result matches the set of cast ballots.
 
 This dissertation addresses all four properties at the cryptographic level. Eligibility is enforced through an on-chain voter whitelist registry. Homomorphic encryption is adopted to achieve ballot secrecy, so that plaintext choices are never stored. Individual verifiability is provided by receipt-based Merkle inclusion proofs. Universal verifiability is enabled through on-chain Groth16 zero-knowledge proof verification of both vote validity and tally correctness.
 
@@ -87,7 +87,7 @@ In this project, two instances of this pattern apply:
 \begin{itemize}
     \item \textbf{Vote proof}: the public statement and witness are
     \begin{align*}
-    x &= (\mathit{commitment},\; H_{ct},\; PK_x,\; PK_y) \\
+    x &= (\mathit{commitment},\; H_{ct},\; \mathit{PK}_x,\; \mathit{PK}_y) \\
     w &= (\mathit{candidateId},\; \mathit{salt},\; r_0, \dots, r_{N-1},\\
        &\quad \mathit{c1X}_0,\; \mathit{c1Y}_0,\; \mathit{c2X}_0,\; \mathit{c2Y}_0,\; \dots,\; \mathit{c1X}_{N-1},\; \mathit{c1Y}_{N-1},\; \mathit{c2X}_{N-1},\; \mathit{c2Y}_{N-1})
     \end{align*}
@@ -95,12 +95,12 @@ In this project, two instances of this pattern apply:
     \item \textbf{Tally proof}: $w = \mathit{sk}$, with public statement
     \begin{equation*}
         \begin{split}
-        x = (&PK_x,\; PK_y,\; \bar{C1}^{X}_0,\; \bar{C1}^{Y}_0,\; \dots,\; \bar{C1}^{X}_{N-1},\; \bar{C1}^{Y}_{N-1},\\
+        x = (&\mathit{PK}_x,\; \mathit{PK}_y,\; \bar{C1}^{X}_0,\; \bar{C1}^{Y}_0,\; \dots,\; \bar{C1}^{X}_{N-1},\; \bar{C1}^{Y}_{N-1},\\
              &\bar{C2}^{X}_0,\; \bar{C2}^{Y}_0,\; \dots,\; \bar{C2}^{X}_{N-1},\; \bar{C2}^{Y}_{N-1},\\
              &R^{X}_0,\; R^{Y}_0,\; \dots,\; R^{X}_{N-1},\; R^{Y}_{N-1},\; \mathit{totalVotes})
         \end{split}
     \end{equation*}
-    where $R_j = n_j \cdot G$ is the result point for candidate $j$, $R^{X}_j$, $R^{Y}_j$ are the coordinates of $R_j$, $n_j$ is the corresponding integer vote count, and $\mathit{totalVotes}$ is the expected sum of all candidate totals (corresponding to $V$ in Chapter 1). Here, $PK_x, PK_y$ denote affine coordinates of $\mathit{PK}$. Likewise, $\bar{C1}^{X}_j,\bar{C1}^{Y}_j$ and $\bar{C2}^{X}_j,\bar{C2}^{Y}_j$ denote affine coordinates of aggregated points $\bar{C1}_j,\bar{C2}_j$.
+    where $R_j = n_j \cdot G$ is the result point for candidate $j$, $R^{X}_j$, $R^{Y}_j$ are the coordinates of $R_j$, $n_j$ is the corresponding integer vote count, and $\mathit{totalVotes}$ is the expected sum of all candidate totals (corresponding to $V$ in Chapter 1). Here, $\mathit{PK}_x, \mathit{PK}_y$ denote affine coordinates of $\mathit{PK}$. Likewise, $\bar{C1}^{X}_j,\bar{C1}^{Y}_j$ and $\bar{C2}^{X}_j,\bar{C2}^{Y}_j$ denote affine coordinates of aggregated points $\bar{C1}_j,\bar{C2}_j$.
 \end{itemize}
 
 \subsection{Formal Security Properties}
@@ -162,7 +162,7 @@ Groth16 implements the QAP argument using bilinear pairings over elliptic curves
 \paragraph{Setup.}
 A trusted party samples secrets $(\tau, \alpha, \beta, \gamma, \delta) \overset{\$}{\leftarrow} \mathbb{F}_p^5$ and computes two structured reference strings:
 \begin{itemize}
-    \item \textbf{Proving key} $\mathit{pk}_{\mathit{Groth}}$: contains $\{[\tau^i]_1\}$ for required powers, $\{[u_j(\tau)]_1\}$, $\{[v_j(\tau)]_2\}$, and blinded combinations---tens of thousands of elliptic-curve points for circuits of this scale (notation distinguished from ElGamal public key $\mathit{PK}$ and coordinates $PK_x,PK_y$).
+    \item \textbf{Proving key} $\mathit{pk}_{\mathit{Groth}}$: contains $\{[\tau^i]_1\}$ for required powers, $\{[u_j(\tau)]_1\}$, $\{[v_j(\tau)]_2\}$, and blinded combinations---tens of thousands of elliptic-curve points for circuits of this scale (notation distinguished from ElGamal public key $\mathit{PK}$ and coordinates $\mathit{PK}_x,\mathit{PK}_y$).
     \item \textbf{Verification key} $\mathit{vk}$: contains $[\alpha]_1$, $[\beta]_2$, $[\gamma]_2$, $[\delta]_2$, and $\{[(\beta u_j + \alpha v_j + w_j)(\tau)/\gamma]_1\}$ for the public signal indices.
 \end{itemize}
 
