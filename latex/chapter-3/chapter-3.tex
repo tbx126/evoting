@@ -9,13 +9,14 @@
 
 \section{Protocol Roles}
 
-The protocol defines three distinct roles, each with a bounded set of privileges and responsibilities.
+The protocol has three live roles: administrator, enrolled voter and public auditor. The primary protected values are vote privacy, result correctness and audit trace integrity.
 
-\textbf{Administrator.} The administrator deploys the election contracts, configures the candidate set, and maintains the voter whitelist. This role retains sole custody of the ElGamal private key $\mathit{sk}$ used to decrypt the aggregated tally. After the voting phase concludes, the administrator performs off-chain homomorphic aggregation, computes the decrypted result points, and submits the tally along with a Groth16 proof (ZKP3) to the contract. The semi-trusted assumption governing this role is formalised in Section~3.2.
+\textbf{Administrator.} The administrator deploys the election contracts, manages the voter whitelist, and retains sole custody of the ElGamal private key $\mathit{sk}$. After voting concludes, the administrator performs homomorphic aggregation and submits the tally together with a Groth16 proof (ZKP3); the semi-trusted assumption governing this role is formalised in Section~3.2.
 
-\textbf{Voter.} Any Ethereum address that appears on the administrator-managed whitelist is eligible to cast exactly one ballot. The voter encrypts a one-hot candidate vector under the election public key, generates a zero-knowledge vote proof (ZKP1/ZKP2), and submits the encrypted ballot together with the proof to the contract. Upon acceptance, the voter retains a local receipt for subsequent audit verification (Section~3.9).
+\textbf{Voter.} Any address on the administrator-managed whitelist may cast exactly one ballot by encrypting a one-hot candidate vector and generating a ZKP1/ZKP2 vote proof. Upon acceptance, the voter retains a local receipt for subsequent audit verification (Section~3.9).
 
-\textbf{Public verifier.} A public verifier is any party that can read on-chain state without holding privileged credentials. Public verifiers may observe lifecycle transitions, inspect Groth16 verification outcomes, replay the homomorphic tally from emitted ciphertext events, and execute the anonymous verification procedure described in Section~3.9 using the published audit bundle. This role embodies the system's transparency guarantee: all assurance properties except key custody are independently auditable from public data alone.
+\textbf{Public auditor.} Any party able to read blockchain data with no credentials: they can see on-chain state transitions, verify proofs of verification results and perform the auditing protocol from Section~3.9 with the public auditable package.
+
 
 \section{Threat Model}
 
@@ -174,73 +175,57 @@ The vote circuit takes private inputs $(\mathit{candidateId},\, \mathit{salt},\,
     \item \textbf{Ciphertext binding.} The circuit hashes all $4N$ ciphertext coordinates $(\mathit{c1X}_0,\,\mathit{c1Y}_0,\,\mathit{c2X}_0,\,\mathit{c2Y}_0,\,\dots,\,\mathit{c1X}_{N-1},\,\mathit{c1Y}_{N-1},\,\mathit{c2X}_{N-1},\,\mathit{c2Y}_{N-1})$ with Poseidon and constrains the digest to equal the public signal $H_{ct}$. Because $H_{ct}$ is recorded on-chain alongside the commitment, any post-proof substitution of ciphertext components is detectable.
 \end{enumerate}
 
-When the proof is accepted by the on-chain Groth16 verifier, these four constraints are satisfied simultaneously. The contract therefore treats the accompanying ballot as a well-formed, in-range, single-candidate vote whose encrypted payload is irrevocably bound to the published commitment.
-
 \section{Homomorphic Tally and Tally Proof}
 
-The additive homomorphism of ElGamal encryption permits the computation of aggregate vote totals without decrypting individual ballots. For each candidate position $j$, the aggregated ciphertext is obtained by elliptic-curve point addition over all $V$ cast ballots:
+ElGamal encryption is additively homomorphic over point encodings, so aggregate vote totals are computed without decrypting individual ballots. For each candidate position $j$, the aggregated ciphertext is obtained by elliptic-curve point addition over all $V$ cast ballots:
 \begin{equation}
 \bar{C1}_j = \sum_{k=1}^{V} C1_{k,j}, \quad \bar{C2}_j = \sum_{k=1}^{V} C2_{k,j}
 \end{equation}
 
-Because each individual ciphertext encrypts either $0 \cdot G$ or $1 \cdot G$ in the one-hot encoding, the aggregate satisfies:
+Since the one-hot encoding maps each ballot to either $0 \cdot G$ or $1 \cdot G$, the aggregate decrypts as:
 \begin{equation}
 \bar{C2}_j - \mathit{sk} \cdot \bar{C1}_j = \left(\sum_{k=1}^{V} m_{k,j}\right) \cdot G = n_j \cdot G
 \end{equation}
-where $n_j$ denotes the integer vote count for candidate $j$. The administrator decrypts the aggregated ciphertext by computing the result point for each candidate:
+where $n_j$ is the integer vote count for candidate $j$. The result point for each candidate is therefore:
 \begin{equation}
 R_j = \bar{C2}_j - \mathit{sk} \cdot \bar{C1}_j
 \end{equation}
 
-Recovery of the integer $n_j$ from the curve point $R_j = n_j \cdot G$ requires a bounded discrete-logarithm search. Since $n_j \le V$ and the total number of voters is practically bounded, the search remains computationally feasible. The administrator submits the recovered integer results to the contract together with a Groth16 proof of decryption correctness.
+Since $n_j \le V$, the integer $n_j$ is recovered from $R_j = n_j \cdot G$ by a bounded discrete-logarithm search. The administrator submits the recovered integer results together with a Groth16 tally proof.
 
-The tally circuit takes a single private input $\mathit{sk}$ and exposes all remaining values as public signals: $(\mathit{PK}_x,\, \mathit{PK}_y,\, \bar{C1}^{X}_j,\, \bar{C1}^{Y}_j,\, \bar{C2}^{X}_j,\, \bar{C2}^{Y}_j,\, R^{X}_j,\, R^{Y}_j,\, \mathit{totalVotes})$ for $j \in \{0,\dots,N{-}1\}$. It enforces three constraint families.
+The tally circuit takes $\mathit{sk}$ as its sole private input and exposes $(\mathit{PK}_x,\, \mathit{PK}_y,\, \bar{C1}^{X}_j,\, \bar{C1}^{Y}_j,\, \bar{C2}^{X}_j,\, \bar{C2}^{Y}_j,\, R^{X}_j,\, R^{Y}_j,\, \mathit{totalVotes})$ for $j \in \{0,\dots,N{-}1\}$ as public signals. It enforces three constraint families.
 \begin{enumerate}
     \item \textbf{Key ownership.} The circuit verifies $\mathit{PK} = \mathit{sk} \cdot G$, confirming that the prover holds the secret key corresponding to the on-chain election public key.
     \item \textbf{Decryption correctness.} For each candidate $j$, the circuit constrains $R_j = \bar{C2}_j - \mathit{sk} \cdot \bar{C1}_j$, ensuring that each result point is the honest decryption of the corresponding aggregated ciphertext.
-    \item \textbf{Sum consistency.} The circuit enforces $\sum_{j=0}^{N-1} R_j = \mathit{totalVotes} \cdot G$ in curve-point arithmetic, confirming that the individual result points collectively account for the declared total number of votes.
+    \item \textbf{Sum consistency.} The circuit enforces $\sum_{j=0}^{N-1} R_j = \mathit{totalVotes} \cdot G$ in curve-point arithmetic, confirming that the result points collectively account for the declared total vote count.
 \end{enumerate}
 
-Before invoking the Groth16 verifier, the contract performs two pre-checks: the public-key coordinates in the proof's public signals must match the on-chain election key, and the $\mathit{totalVotes}$ signal must equal the contract's internal vote counter. These guards ensure that the proof pertains to the correct election instance and voter population. If the proof is accepted, the contract stores the submitted integer results and the Merkle root, then transitions the election to the \texttt{Tallied} state.
-
-The circuit binds correctness at the level of curve points rather than integers. Per-candidate integer-to-point correspondence ($n_j \cdot G = R_j$) is independently verifiable by any auditor who recomputes the scalar multiplication, but this check is not enforced by contract-level constraints. This design boundary and its implications are discussed further in Section~5.8.
+Before invoking the Groth16 verifier, the contract performs two pre-checks: the public-key coordinates in the proof's public signals must match the on-chain election key, and the $\mathit{totalVotes}$ signal must equal the contract's internal vote counter. If the proof is accepted, the contract stores the integer results and the Merkle root, then transitions to the \texttt{Tallied} state.
 
 \section{Merkle Audit Construction}
 
-The Merkle audit tree provides a compact digest of all $V$ ballot commitments, enabling $O(\log V)$ inclusion verification for individual voters. The tree takes as input the ordered sequence of on-chain commitments and produces a single root hash that is stored on-chain upon tally finalisation.
-
-Leaf nodes are the Poseidon commitment values themselves, used directly without additional hashing:
+A Merkle tree over all $V$ ballot commitments provides $O(\log V)$ inclusion proofs, enabling any voter or auditor to verify that a specific ballot commitment is part of the finalised set. Each leaf holds one ballot commitment:
 \begin{equation}
 \mathit{leaf}_i = \mathit{commitment}_i
 \end{equation}
 
-Internal nodes are computed using Keccak256 over the concatenation of their two children:
+Adjacent nodes are combined upward through Keccak256 to form each internal node, with the resulting root stored on-chain at tally finalisation:
 \begin{equation}
 \mathit{node} = \mathsf{Keccak256}(\mathit{left} \parallel \mathit{right})
 \end{equation}
 
-This hybrid construction---Poseidon leaves produced by the vote circuit and Keccak256 internal nodes for EVM-native compatibility---balances arithmetic-circuit efficiency at the leaf level with gas-efficient on-chain verification at intermediate levels.
-
-The tree construction observes three deterministic rules that together guarantee reproducibility.
-
-\textbf{Canonical ordering.} Commitments are sorted lexicographically by $(\texttt{blockNumber},\, \texttt{transactionIndex},\, \texttt{logIndex})$. This total ordering ensures that any implementation processing the same set of on-chain events will compute an identical root.
-
-\textbf{Odd-layer padding.} When a tree layer contains an odd number of nodes, the final node is duplicated to serve as its own sibling, thereby completing the binary pairing for that layer.
-
-\textbf{Root immutability.} Once the election transitions to the \texttt{Tallied} state, a contract-level state guard rejects any subsequent call to update the \texttt{merkleRoot}. The audit digest is therefore fixed on-chain from the point of finalisation onward.
-
-Proving the inclusion of any single commitment requires only the $O(\log V)$ sibling hashes along the leaf-to-root path. Voters combine this Merkle proof with their locally stored receipt to execute the anonymous verification procedure described in Section~3.9.
+Internal nodes use Keccak256 to make the tree compatible with EVM-native audit tooling, and leaves are the Poseidon commitments already generated by the vote circuit. If a layer is of an odd cardinality, the last node is copied. Commitments are ordered according to \texttt{blockNumber}, \texttt{transactionIndex}, \texttt{logIndex} prior to tree construction; this gives rise to deterministic roots if and only if all realisations use the same ordering. Once the tally is finalised, Merkle root updates are rejected by a \texttt{Tallied}-state guard and the audit digest remains immutable on-chain.
 
 \section{Anonymous Verification Procedure}
 
-This procedure enables a voter to confirm that their ballot commitment was included in the finalised audit set, without revealing their identity or ballot content during the verification step. The voter retains a local receipt containing five fields: candidate identifier, salt, commitment, transaction hash, and election identifier.
+The anonymous verification procedure allows any voter to confirm that their ballot commitment is included in the finalised audit set without disclosing their identity or ballot content. The voter holds a local receipt with five fields: \textit{candidateId}, \textit{salt}, \textit{commitment}, \textit{txHash}, and \textit{electionId}.
 
-Verification proceeds through four sequential checks:
+Verification proceeds through four sequential steps:
 \begin{enumerate}
-    \item Recompute the commitment as $\mathsf{Poseidon}(\mathit{candidateId},\, \mathit{salt})$ from the receipt fields and confirm that the result matches the stored commitment value.
-    \item Locate the entry in the audit bundle whose commitment and transaction hash both match the receipt.
-    \item Verify the Merkle inclusion path from the matched leaf to the bundle root using the sibling hashes provided in the bundle entry.
-    \item Accept if and only if the Merkle path is valid, the bundle root equals the on-chain \texttt{merkleRoot}, and the election identifier in the bundle metadata matches the receipt.
+    \item Recompute $\mathsf{Poseidon}(\mathit{candidateId},\, \mathit{salt})$ from the receipt and confirm it matches the stored commitment.
+    \item Locate the audit bundle entry whose commitment and transaction hash both match the receipt.
+    \item Verify the Merkle inclusion path from the matched leaf to the bundle root using the provided sibling hashes.
+    \item Accept if and only if the path is valid, the bundle root equals the on-chain \texttt{merkleRoot}, and the election identifier matches.
 \end{enumerate}
 
 Because the procedure relies on commitment and transaction hash rather than the voter's address, no address-based lookup is required. However, on-chain vote events still record the sender address alongside the commitment; this linkage is visible at the chain layer and falls outside the scope of this verification-flow abstraction.
