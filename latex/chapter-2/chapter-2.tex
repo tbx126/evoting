@@ -41,7 +41,7 @@ Early research in this area usually focused on demonstrating feasibility of inte
 
 \subsection{Summary and Research Gap}
 
-In \S2.1.3, the discussion of the former two existing systems reveals a persistent limitation: centralized systems lack transparent assurances of integrity. Early blockchain-based prototypes, in contrast, fall into one of two flawed categories. Some treat ballot contents as plaintext, thereby sacrificing voter privacy; others use encryption algorithms to protect individual votes but fail to provide any proof. This integration gap motivates this dissertation. Table~\ref{tab:approach-comparison} summarises the architectural differences.
+In \S2.1.3, these two existing system designs show that: centralized systems lack transparency. In contrast, every step in the election is encoded into logs which are recorded on the blockchain ledger and public to everyone. However, there are two main shortcomings: some treat ballot contents as plaintext, sacrificing privacy; others employ encryption algorithms to protect votes but fail to give any evidence. The research gap motivates this dissertation.
 
 \begin{table}[htbp]
 \centering
@@ -52,18 +52,18 @@ In \S2.1.3, the discussion of the former two existing systems reveals a persiste
 \toprule
 Criterion & Centralised E-Voting \cite{springall2014,adida2008} & Blockchain-Only Voting \cite{mccorry2017,hjalmarsson2018} & Integrated Approach (Blockchain + HE + ZKP + Merkle) \\
 \midrule
-State transparency & Limited to operator-controlled logs & High for on-chain actions & High; lifecycle and commitments on-chain \\
-Ballot confidentiality & Depends on backend access policy & Weak if ballots stored in plaintext on-chain & ElGamal encryption; only hashes stored on-chain \\
-Tally verifiability & Relies on operational trust & Moderate unless cryptographic proofs are added & Groth16 proofs for vote validity and tally \\
-Voter-side inclusion check & Rare, or requires account-linked queries & Possible but may expose voter address & Receipt-based Merkle inclusion; no address lookup \\
-Operational complexity & Lower & Moderate & Higher; stronger assurance \\
+State transparency & Limited to operator-controlled logs & High for on-chain actions & High; recorded on-chain \\
+Ballot secrecy & Depends on backend access policy & Weak if ballots stored in plaintext on-chain & ElGamal encryption \\
+Result verifiability & Relies on operational trust & Moderate unless cryptographic proofs are added & Groth16 for ballot and tally validity \\
+Vote inclusion check & Rare, or requires account-linked queries & Possible but may expose voter address & Merkle inclusion \\
+Practical complexity & Lower & Moderate & Higher \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \section{Homomorphic Encryption for Private Tally}
 
-Paillier encryption \cite{paillier1999} recurs throughout electronic voting literature. The scheme adds integers directly without any encoding step. Helios \cite{adida2008} embraced it for precisely this reason. Its arithmetic nevertheless encounters a fundamental mismatch. Ciphertexts compute modulo a composite integer. zk-SNARK circuits instead require pure finite-field operations. Embedding the Paillier scheme inside a Groth16 circuit therefore calls for non-native field arithmetic. The resulting constraint count rises sharply.
+Paillier encryption \cite{paillier1999} is adopted in lots of e-voting systems. It performs addition directly on each component of the encoded ballot. Helios \cite{adida2008} is one of these systems. Its arithmetic nevertheless encounters a fundamental mismatch. Ciphertexts compute modulo a composite integer. zk-SNARK circuits instead require pure finite-field operations. Embedding the Paillier scheme inside a Groth16 circuit therefore calls for non-native field arithmetic. The resulting constraint count rises sharply.
 
 ElGamal encryption offers a more compatible alternative. On elliptic-curve discrete-logarithm groups it supports additive homomorphism over encoded messages \cite{elgamal1985,hankerson2004ecc}. This work deploys the scheme on BabyJubJub \cite{eip2494}. The curve is defined over the BN254 scalar field. Native arithmetic in Groth16 circuits follows directly. No field conversion overhead materializes.
 
@@ -73,11 +73,9 @@ Privacy holds provided the secret key remains uncompromised and plaintext side c
 
 \section{Zero-Knowledge Proofs in Voting}
 
-Zero-knowledge proofs are cryptographic protocols in which, given some statement to be verified, one party (the prover) can convince another party (the verifier) of its correctness without revealing anything other than the statement being correct \cite{goldwasser1989}. For e-voting, this functionality is fundamental: a voter needs to demonstrate that her ballot is well-formed (i.e., encodes only one valid vote for a candidate) without disclosing the chosen candidate; a manager who wants to show that some count was properly decrypted (without revealing the secret key). ZKPs thus enable the two desirable properties of public verifiability and ballot privacy to be simultaneously achieved.
-
 \subsection{The Problem ZKPs Address}
 
-Many non-zero-knowledge proof workflows require witness (secret data) exposure to the verifier. In e-voting this is unacceptable: exposing a candidate index in order to prove ballot validity kills ballot secrecy; revealing a decryption key to prove the correct tally collapses key governance.
+Zero-knowledge proofs are a kind of cryptographic techniques to give some statements without leaking any information related to them. Many non-zero-knowledge proof workflows expose sensitive information or secret data to the verifier in order to give a proof.
 
 ZKPs separate the \emph{claim} from the \emph{evidence}. Let $x$ be a public statement and $w$ be a private witness. Define a relation $\mathcal{R}$ such that $(x, w) \in \mathcal{R}$ means ``$w$ is a valid witness for $x$''. A ZKP system allows a prover who knows $w$ to produce a short artifact $\pi$ that convinces any verifier that $(x, w) \in \mathcal{R}$, without $\pi$ leaking any information about $w$.
 
@@ -193,7 +191,7 @@ where $k$ is the number of pairing pairs. The Groth16 verification equation requ
 
 \subsection{Implementation Pipeline}
 
-The implementation follows a four-stage workflow:
+Translating an abstract proof relation into a deployable on-chain verifier involves four stages, each of which introduces specific artefacts and trust considerations:
 
 \begin{enumerate}
     \item \textbf{Circuit specification.} The prover's relation $\mathcal{R}$ is expressed as an arithmetic circuit written in the Circom domain-specific language \cite{circomdocs}. Library templates from circomlib supply reusable components for BabyJubJub point arithmetic, Poseidon hashing, range checks, and conditional logic. The Circom compiler transforms the high-level description into two outputs: an \texttt{.r1cs} file encoding the constraint matrices $(A, B, C)$ and a WebAssembly (WASM) witness generator that, given concrete inputs, computes the full witness vector $\mathbf{s}$.
@@ -220,14 +218,14 @@ The on-chain verifier contracts (\texttt{VoteVerifier.sol}, \texttt{TallyVerifie
 
 \section{Commitments, Hashing, and Merkle Auditability}
 
-In this scheme, one such commitment serves as the binding receipt of secret ballot information. The voter computes a hash over candidate ID and salt, then publishes just the digest. Subsequent edits of either secret value would alter that digest and thus could not silently rewrite the original claim.
+In this design, the commitment is treated as the binding receipt of encrypted ballot. The voter calculates a hash over candidate ID and a random salt value. Because of the preimage resistance of hash functions, there is no way for others to find the plaintext via the hash value.
 
-Poseidon is used for this commitment step because it maps efficiently to arithmetic constraints in zk circuits \cite{poseidon2021}. That choice matters in practice: the same hash must be checked inside proof generation, so an expensive circuit hash directly increases proving overhead.
+Instead of SHA-256 or other popular traditional hash functions which has been widely used in bitcoin or other blockchain systems, Poseidon \cite{poseidon2021} is adopted in this scenario because its optimization for arithmetic circuits makes it more efficient and suitable.
 
-By means of a Merkle tree \cite{merkle1988}, the auditability can be extended from single commitments to the full ballot set. In each leaf, each commitment is stored, while the root commits to the whole ordered list. Inclusion proofs are logarithmic in the number of leaves, and hence verification is affordable even for large groups.
+In the commitment Merkle tree \cite{merkle1988}, every two commitments recursively generated a new commitment until there is only one commitment which then is the merkleRoot. Through a Merkle tree, the auditability is expanded to the full ballot set. The complexity of inclusion proofs are logarithmic with the number of votes, hence verification is affordable and acceptable even for a large amount of ballots.
 
-This design enables two orthogonal verifiability checks. The voter can verify whether their own commitment was included below the published root, while not leaking any other identity-related data during this check. Individually, an outside auditor is able to recalculate the root based on published entries in some deterministic order and then compares that with the announced root as well as the onchain root value.
+The protocol supports two mutually independent verification mechanisms. Each voter is able to confirm, with high assurance, that their own commitment is correctly included in the Merkle tree below the published root, while obtaining no information whatsoever about any other voter's identity or commitment. Individually, an outside auditor is able to recalculate the root based on published entries in some deterministic order and then compares that with the announced root as well as the onchain root value.
 
-Chapter~3 translates these foundations into a formal protocol model, specifying the system roles, threat assumptions, and end-to-end workflow that the implementation in Chapter~4 realises.
+Chapter~3 turns these foundations into a practical protocol model, on which Chapter~4 is built.
 
 \endgroup

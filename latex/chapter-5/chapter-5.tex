@@ -20,8 +20,6 @@ Two complementary strategies are used: automated testing (contract and cryptogra
 
 \section{Automated Verification Results}
 
-The repository provides two automated verification layers.
-
 \subsection{Smart Contract Integration Tests}
 
 Hardhat tests validate:
@@ -51,7 +49,7 @@ At the time of evaluation, the local test baseline was:
     \item Python crypto tests: 43 passed.
 \end{itemize}
 
-These results support the claim that the prototype is reproducible and functionally coherent in controlled environments.
+The outcomes provide evidence to conclude that the prototype is replicable, and functional at a high level of coherence under controlled settings.
 
 \subsection{Runtime and Reproducibility Snapshot}
 
@@ -106,11 +104,11 @@ A practical end-to-end run proceeds:
     \item Administrator exports \texttt{audit\_bundle.json}; voters verify inclusion using receipt.
 \end{enumerate}
 
-The key operational output is that a voter can validate inclusion without calling \texttt{getVoteRecord(address)}. This reduces address-based linkability and supports the project requirement of verifiable privacy.
+The main working result is that, for a voter to verify inclusion without invoking \texttt{getVoteRecord(address)} thereby reducing address based linkability which satisfies the project requirement of provable privacy.
 
 \section{Performance Evaluation}
 
-This section reports quantitative measurements of the system's on-chain gas consumption, zero-knowledge proof circuit complexity, client-side artifact footprint, and smart contract bytecode size. All measurements were taken using the project's current build artifacts with Solidity 0.8.20 (optimizer enabled, 200 runs), Groth16 on BN254, and the circuit configuration of $N=2$ candidates.
+This section reports some quantitative measurements about the system's on-chain gas cost and ZK proof circuit size, client-side artifact footprint, and smart contract bytecode size. All measurements were taken on the project's current build artifacts with Solidity 0.8.20 (optimizer enabled, 200 runs), Groth16 on BN254, and the circuit configuration of $N=2$ candidates.
 
 \subsection{Circuit Complexity}
 
@@ -156,11 +154,11 @@ Artifact & Size & Role \\
 \end{tabular}
 \end{table}
 
-For a voter casting a ballot, the browser must load approximately 10.06~MiB of proof artifacts (WASM + zkey). This is a one-time download per session and can be cached. The administrator performing a tally loads approximately 9.26~MiB. These sizes are consistent with typical Groth16 deployments at this constraint scale and are within practical browser download budgets for modern connections.
+For a voter casting a ballot, the browser must load approximately 10.06~MiB of proof artifacts (WASM + zkey). One download per session but cacheable; it is around 9.3~MiB for a tallying admin. These numbers line up with typical Groth16 deploys at this size of constraints and are well within reasonable budgetary expectations in terms of browser download sizes for modern links.
 
 \subsection{On-Chain Gas Consumption}
 
-Gas costs are central to evaluating blockchain-based protocol feasibility. Groth16 proof verification dominates the on-chain cost due to the \texttt{ecPairing} precompile, which on EVM costs $45{,}000 + 34{,}000 \times k$ gas for $k$ pairing checks (Groth16 uses $k = 4$, yielding 181{,}000 gas for the pairing alone).
+Gas costs are at the core when assessing the viability of a protocol based upon blockchains. Due to the \texttt{ecPairing} precompile, Groth16 proof verification takes up most of the cost on chain, which on EVM costs $45{,}000 + 34{,}000 \times k$ gas for $k$ pairing checks (Groth16 uses $k = 4$, yielding 181{,}000 gas for the pairing alone).
 
 Table~\ref{tab:gas-costs} reports measured gas consumption from transaction receipts in a fresh local Hardhat run against the current repository revision. The dominant cost components are interpreted with reference to EIP-1108 precompile costs \cite{eip1108} and the storage-access behavior of \texttt{Voting.sol}.
 
@@ -183,11 +181,11 @@ Operation & Measured Gas & Dominant Cost Component \\
 \end{tabular}
 \end{table}
 
-To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.01102--0.01205~ETH (\$27.6--\$30.1), and one \texttt{updateTallyResults} costs approximately 0.01495~ETH (\$37.4). Under a 30M gas block limit, a block could fit roughly 74--81 vote transactions if they were the only transactions, although in practice, block space is shared and gas prices vary.
+To contextualize these costs: at a gas price of 30~gwei and an ETH price of \$2{,}500, one \texttt{castVote} transaction costs approximately 0.01102--0.01205~ETH (\$27.6--\$30.1), and one \texttt{updateTallyResults} costs approximately 0.01495~ETH (\$37.4). The Ethereum block gas limit (30M gas) can accommodate roughly 74--81 vote transactions per block if they were the only transactions, although in reality the blockspace is shared. (Gas price and ETH price numbers are representative prices as evaluated, they will fluctuate based on network performance.)
 
 \subsection{Proof Generation Latency}
 
-Groth16 proof generation is the most computationally intensive client-side operation. It involves multi-scalar multiplication over the proving key, which scales with the number of circuit constraints. For the current configuration ($N = 2$), a fresh local Node.js measurement on the current repository revision produced vote-proof latencies between 615~ms and 1{,}052~ms across three representative ballots, and a tally-proof latency of about 848~ms. Browser-based execution using snarkjs WASM is expected to be similar or somewhat slower depending on device hardware and caching behavior.
+Groth16 proof generation is the most computation intensive part on the client side. It includes multi-scalar multiplication over the proving key, which is proportional to the number of circuit constraints. For the current configuration ($N = 2$), a fresh local Node.js measurement on the current repository revision produced vote-proof latencies between 615~ms and 1{,}052~ms across three representative ballots, and a tally-proof latency of about 848~ms. Browser-based execution using snarkjs WASM is expected to be similar or somewhat slower depending on device hardware and caching behavior.
 
 These times are acceptable for a prototype where voters submit one ballot per election. However, they represent a usability consideration: the voter interface should communicate proof-generation progress to avoid the impression of an unresponsive application.
 
@@ -204,18 +202,18 @@ Ethereum imposes a 24{,}576-byte limit on deployed contract bytecode (EIP-170 \c
 \toprule
 Contract & Deployed Size & Notes \\
 \midrule
-\texttt{Voting} & 10{,}168 bytes (9.9 KB) & Main election logic with integrated voter registration; largest contract \\
+\texttt{Voting} & 10{,}168 bytes (9.9 KB) & Main election process \\
 \texttt{VoteVerifier} & 1{,}658 bytes (1.6 KB) & Groth16 verifier (snarkjs-generated) \\
 \texttt{TallyVerifier} & 2{,}690 bytes (2.6 KB) & Groth16 verifier (snarkjs-generated) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The total deployed bytecode across all three contracts is 14{,}516 bytes. The Voting contract is the largest at about 41\% of the EIP-170 limit, leaving substantial headroom for additional features if needed. The Groth16 verifier contracts remain compact because snarkjs generates optimized inline pairing-check code.
+The total amount of deployed bytecode across all 3 contracts is 14{,}516 bytes. The Voting contract is large (41\%) but still well under the EIP-170 limit and leaves space for more features if needed. Combining the voter register in with the voting contract results in a slightly larger contract, but removed two deployments. The Groth16 verifier contracts are small since snarkjs generates optimised inline pairing-check code.
 
 \subsection{Scalability Discussion}
 
-The system's scalability characteristics vary by component. On-chain gas per vote (\texttt{castVote}) is essentially constant regardless of how many votes have already been cast, because each vote is independently verified and stored. Let $B_{dlog}$ denote the discrete-log search bound used by the tally client. In the current implementation, $B_{dlog}=V+100$ where $V$ is total votes cast. Several operations scale with election size:
+The scalability properties of the system are different for each component. The on-chain gas used per vote (\texttt{castVote}) is almost constant, irrespectively from how much voting has already happened, since every ballot is checked separately and recorded. Let $B_{dlog}$ denote the discrete-log search bound used by the tally client. In the current implementation, $B_{dlog}=V+100$ where $V$ is total votes cast. Several operations scale with election size:
 
 \begin{itemize}
     \item \textbf{Tally aggregation} requires $O(VN)$ elliptic-curve point additions, performed off-chain by the administrator. For $V = 1{,}000$ votes and $N = 2$ candidates, this amounts to 2{,}000 point additions, completing in under one second on modern hardware.
@@ -249,7 +247,7 @@ Overall, the prototype is well-suited for small-to-medium elections (up to sever
 
 \section{Commitment Merkle Auditability}
 
-The audit design uses commitment leaves directly and derives internal nodes with Keccak256. Deterministic event ordering ensures that independent auditors can reconstruct the same root given the same event set.
+Keccak256 algorithm is used in the audit design to compute internal nodes via commitment leaves. As a deterministic hash function, there is no randomness in Keccak256; therefore, given the same event set at the same ordering, independent third-party auditors always reproduce the same root value.
 
 \subsection{Audit Bundle Content}
 
@@ -336,13 +334,13 @@ Ballot confidentiality is achieved by encryption and by ensuring that plaintext 
 
 \subsection{Residual Risks}
 
-Residual risks arise primarily from key custody and client environment. Even with cryptographic correctness, compromised endpoints can leak salts, candidate selection, or tamper with local witness generation. These are outside the guarantee boundary of the protocol.
+The most important residual risks come from key custody and the client's environment. Even if cryptographically correct, an attacked endpoint may leak salt, candidate selection, or manipulate the local witness generation. All this is beyond the guarantee of the protocol.
 
 \section{Outstanding Engineering Gaps and Their Impact}
 
 Code review identified three remaining gaps that affect full assurance. Gaps are classified by impact: \textbf{P1} (high impact, fix before any public deployment) and \textbf{P2} (medium impact, fix before production use):
 \begin{itemize}
-    \item \textbf{[P1] Result binding gap}: contract verifies tally proof but does not strictly bind the submitted integer result vector to all public signals used by the circuit. This can allow inconsistencies if external checks are not enforced.
+    \item \textbf{[P1] Result binding gap}: contract verifies tally proof, but does not strictly binds submitted integer result vector to all public signals used by the circuit, which may allows inconsistency as long as no outside check is imposed.
     \item \textbf{[P1] Ciphertext event binding gap}: the emitted encrypted payload is not fully bound to on-chain stored ciphertext hash. If an attacker can influence event payload parsing or indexing, off-chain tally can be poisoned.
     \item \textbf{[P2] Merkle root mutability}: an admin-only root-update function remains available before tally finalization; although overwrites are rejected once the election reaches \texttt{Tallied}, the pre-finalization update path still increases governance attack surface.
 \end{itemize}

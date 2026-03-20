@@ -9,37 +9,37 @@
 
 \section{Backgrounds}
 
-Electronic voting systems offer the prospect of rapid tabulation, broader voter accessibility, and auditable records that can withstand independent scrutiny. These advantages ensure this method's continued interest in electoral technology reform for many years.
+Digital transformation has been integrated into many different aspects of the community. Electronic voting systems have features of convenience and efficiency. For decades, these strengths have kept digital technology everlasting prosperity in related reform discussion.
 
-However, it's more challenging than what people expected when turning these features into implementation. A reliable e-voting system should keep ballot privacy, ensure correct state transition, transparency for verification and remain practical for election admin and voters. Satisfying all of these demands at the same time introduces imbalance and tensions, which may cause shortcomings observed in systems.
+Yet, turning these features into practice is far more difficult than expected.
 
-Centralized platforms are effective in usability and throughput, but they require a lot of institutional trust while leaving external auditors lack of recourse to verify.
+Ballot secrecy, transparency for verification, and practical feasibility are three significant requirements for every functional e-voting system to satisfy. Meeting those competing demands at the same time always introduces tensions and imbalances, which necessitating trade-offs.
 
-This dissertation focus on exploring a method in which voters and observers shift their trust from institution to on-chain records supported by cryptographic proofs. Therefore, they no longer need to believe anyone except math.
+Centralized systems provide users with smooth experience and fast processing speed. To do so, voters have to concentrate trust on server operators. Those operators control logs, manage state changes, and release the final counting results. Independent checks reach only as far as the managers choose to allow. When disputes arise, investigators face restricted data access, making it impossible to conduct independent verification.
 
-The architecture integrates three mechanisms within an end-to-end pipeline: ElGamal homomorphic encryption on the BabyJubJub curve for privacy-preserving tally computation, Groth16 zero-knowledge proofs for succinct on-chain verification of ballot validity and decryption correctness, and commitment-based Merkle inclusion proofs for post-election ballot-inclusion verification.
+This dissertation pursues a different approach. It shifts voters' trust from electoral operators to mathematics and cryptographic algorithms.
 
-To design such a system, there are four tensions that need to be balanced: ensuring ballot confidentiality throughout submission, storage, and tallying; checking the correctness of each ballot and final results without revealing them; maintaining state changes via on-chain tracking; and enabling auditability through receipt-based inclusion checks without exposing the address.
+ElGamal homomorphic encryption, Groth16 zero-knowledge proofs and commitment-based Merkle inclusion proofs are integrated together to address privacy protection, verification transparency and ballot inclusion check.
+
+This prototype goes beyond a purely theoretical outline. It compiles successfully, support deployment on local environment and real Ethereum test network (Sepolia). The system design has undergone automatic testing and is available for independent review.
 
 
 \section{Motivations}
 
 Three convergent technical advances make the proposed combination of methods practically feasible.
 
-First, blockchain platforms such as Ethereum provide programmable smart contracts together with append-only event logs and deterministic execution semantics. These properties eliminate an entire class of attacks common to centralised systems---namely, silent, undetectable modifications to election records \cite{nakamoto2008,wood2014}.
+First, programmable blockchain such as Ethereum provide Solidity environment for smart contracts with append-only event logs and deterministic execution codes. These properties eliminate an entire class of attacks common to centralized systems---namely, silent, undetectable modifications to election records \cite{nakamoto2008,wood2014}.
 
-Second, recent progress in zk-SNARK constructions, most notably the Groth16 proving system, enables the generation of succinct, constant-size proofs whose on-chain verification cost remains bounded within practical smart-contract gas limits \cite{groth2016}.
+Second, with zk-SNARK constructions, especially in the Groth16 proving system, succinct proofs can be easily generated and the on-chain verification cost remain acceptable within the gas limit \cite{groth2016}.
 
-Third, algebraically efficient hash functions such as Poseidon, designed specifically for arithmetic circuits, together with Merkle-tree constructions, support efficient post-election inclusion checks over large ballot sets without imposing prohibitive on-chain storage costs \cite{poseidon2021,merkle1988}.
+Third, compared to traditional hash function, such as SHA-256, Poseidon is optimized for arithmetic circuits and become much more algebraically efficient. When it's combined with Merkle tree constructions, vote inclusion checks over larger ballot sets can be practical. This makes the system remains scalable and cost-effective, since the cost increases logarithmically, rather than linearly, with the total number of ballots \cite{poseidon2021,merkle1988}.
 
-Taken together, these components open a viable design space in which the tension between voter privacy and public verifiability becomes substantially more manageable.
-
-Building on these advances, this study pursues five objectives:
+To build on these advances, this study has these five objectives:
 
 \begin{itemize}
-    \item Design and implement a contract-level state machine that enforces explicit, tamper-evident lifecycle transitions for the election.
-    \item Enable private ballot submission through one-hot ElGamal encryption on the BabyJubJub curve, ensuring that each encrypted ballot encodes exactly one valid candidate choice.
-    \item Employ Groth16 zero-knowledge proofs for on-chain verification of both individual ballot validity and the correctness of tally claims derived from off-chain homomorphic aggregation.
+    \item Create a state machine that enforces explicit lifecycle transition for the election.
+    \item One-hot ElGamal encryption on the BabyJubJub curve is adopted to ensure that every ballot is valid and encrypted.
+    \item Use Groth16 zero-knowledge proofs to verify the validity of individual ballot and the correctness of tally derived from off-chain homomorphic aggregation.
     \item Develop a receipt-based audit mechanism whereby voters can confirm, using a locally stored receipt and a published audit bundle, that their ballot commitment has been correctly included.
     \item Evaluate the strengths of the resulting implementation alongside its limitations, including residual engineering constraints, trust assumptions, and binding gaps that currently prevent higher-assurance deployment.
 \end{itemize}

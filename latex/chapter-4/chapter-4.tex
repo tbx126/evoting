@@ -18,9 +18,7 @@ The repository is organised into five major modules:
     \item \texttt{test/} and \texttt{tests/}: JavaScript/Hardhat and Python/Pytest verification suites.
 \end{itemize}
 
-This modularity allows independent testing of smart-contract logic, cryptographic primitives, and user-facing flows.
-
-Figure~\ref{fig:system-architecture} illustrates the implementation layering and data movement between components.
+This modularity enables independent testing of the smart-contract logic, the crypto primitive and the user-facing flow.
 
 \begin{figure}[htbp]
 \centering
@@ -40,7 +38,7 @@ Figure~\ref{fig:system-architecture} illustrates the implementation layering and
 \label{fig:system-architecture}
 \end{figure}
 
-\noindent In Figure~\ref{fig:system-architecture}, solid arrows represent interaction paths: runtime submission flows (Frontend $\rightarrow$ Crypto $\rightarrow$ Chain), and test-time validation exchange (Chain $\leftrightarrow$ Off-chain Validation). The dashed return path denotes a development feedback loop rather than an on-chain protocol message.
+\noindent Figure~\ref{fig:system-architecture} depicts the architectural layering, principal data flows and components interactions. Solid arrows illustrate the operational workflows: runtime submission flows (Frontend $\rightarrow$ Crypto $\rightarrow$ Chain), and test-time validation exchange (Chain $\leftrightarrow$ Off-chain Validation). The dashed return arrow, by contrast, represents solely a development feedback loop and not carrying any on-chain protocol message.
 
 \section{Smart Contract Design}
 
@@ -51,19 +49,19 @@ The voting contract is responsible for:
     \item election initialization and candidate registration;
     \item lifecycle transition enforcement;
     \item vote acceptance conditioned on proof verification and voter eligibility;
-    \item tally finalization conditioned on proof verification and consistency checks;
+    \item finalizing the tally based upon verification of proofs and consistency;
     \item Merkle-root publication for post-election audit.
 \end{itemize}
 
-Voter registration and one-vote enforcement are handled directly within the Voting contract, eliminating a separate registry dependency. Verifier contracts expose on-chain Groth16 verification interfaces.
+No external voter/enforcer registry required as all the voters and enforcers enforce one vote themselves within their contracts: Voter, Voting. On-chain Groth16 verification method implemented by Verifier contracts.
 
 \subsection{On-Chain Data Model}
 
-Key on-chain structures include candidate records, per-voter vote metadata (commitment and ciphertext hash), a global commitment array, and persisted point-form tally outputs (\texttt{tallyResultPointX}/\texttt{tallyResultPointY}). Ciphertext payload itself is emitted as event data to reduce storage cost while preserving off-chain reconstructability.
+Some of the main data-structures that are stored on chain are candidate details, voter's ballot information (i.e., commitment and cipher-text digest) for each voter, Commitments list etc., and continued output of the point-form tally results (\texttt{tallyResultPointX}/\texttt{tallyResultPointY}). The ciphertext payload itself are also emitted as events' values for saving on storage costs, yet maintaining the ability to reconstruct off-chain.
 
 \subsection{Lifecycle Safeguards}
 
-Contract modifiers enforce role and state restrictions. Invalid phase transitions, unauthorized calls, duplicate votes, and malformed proof submissions are rejected before state mutation. One deliberate exception is \texttt{updateMerkleRoot}: it remains admin-callable until status \texttt{Tallied}. This governance tradeoff and its assurance impact are discussed in Section~5.8 (P2: Merkle root mutability).
+The contract modifiers implement the role/state restrictions. Forbidden phase transitions, unauthorised calls, double voting, and malformed proof submissions are rejected prior to state mutation. The only intentional exception is \texttt{updateMerkleRoot}: it continues being admin-callable until status \texttt{Tallied}. This governance tradeoff and its impact on assurances are discussed in Section~5.8 (P2: Merkle root mutability).
 
 Table~\ref{tab:module-responsibility} summarizes how major modules split responsibilities.
 
@@ -76,11 +74,11 @@ Table~\ref{tab:module-responsibility} summarizes how major modules split respons
 \toprule
 Module & Primary Input & Responsibility \\
 \midrule
-Voting contract & Proof calldata, commitments, tally outputs & Enforce lifecycle and accept/reject transitions by verification outcome. \\
-Vote circuit & Candidate choice, salt, ciphertext components & Prove ballot legality and commitment/ciphertext consistency. \\
-Tally circuit & Aggregated ciphertexts, secret key witness & Prove decryption correctness and total consistency. \\
-Voter frontend & Candidate selection + wallet signature & Generate encrypted ballot and vote proof; store verification receipt. \\
-Admin frontend & Encrypted vote events + admin key & Aggregate/decrypt tally, generate ZKP3, build/export audit bundle. \\
+Voting contract & Proof data, commitments, tally results & Manage election lifecycle; verify proofs and enforce state transitions. \\
+Vote circuit & Candidate ID, salt, ciphertext coordinates & Prove ballot validity and commitment-ciphertext binding. \\
+Tally circuit & Aggregated ciphertexts, secret key & Prove correct decryption and vote-total consistency. \\
+Voter frontend & Candidate selection, wallet signature & Encrypt ballot, generate vote proof, store receipt. \\
+Admin frontend & Encrypted vote events, admin secret key & Aggregate/decrypt tally, generate ZKP3, build/export audit bundle. \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -97,7 +95,7 @@ The tally circuit verifies key ownership relation and per-candidate decryption c
 
 \subsection{Artifact Pipeline}
 
-Proof generation follows the standard Groth16 flow: circuit compilation, trusted setup artifacts, witness construction, proof generation, and verifier calldata export \cite{circomdocs,snarkjs}. Contract-side verification executes with precompiled pairing checks.
+The proof is generated following the normal Groth16 flow: circuit compiling, trusted setup artifacts, witness building and proving, and verifier calldata export \cite{circomdocs,snarkjs}. Verification is performed on the contract side using a pair-checking pre-compile.
 
 \section{Frontend Engineering Workflow}
 
@@ -141,17 +139,17 @@ This separation reduces logic duplication and improves testability.
 
 \subsection{Contract-Level Tests}
 
-Hardhat tests cover role control, lifecycle transitions, valid/invalid voting attempts, and tally submission behavior with Groth16 proofs. End-to-end scenarios include realistic proof generation and verifier invocation. To keep suite runtime stable, expensive Groth16 proofs are generated once in a shared setup hook and then reused across behavior-focused test cases.
+The Hardhat tests check the behaviour of roles controls, transitions between states, attempted vote creation (valid and invalid), tally submitter when using Groth16 proofs and end to end scenario such as generating real proofs and invoking a verifier. Measures have been taken in order not to increase too much the execution time of the test suite: costly Groth16 proofs are produced only once, during a common setup hook, and then recycled among the behavior-oriented tests.
 
 \subsection{Cryptographic Unit Tests}
 
-Pytest cases validate curve arithmetic invariants, key generation, encryption/decryption correctness, homomorphic addition, one-hot vote encoding semantics, and bounded discrete-log solving.
+Pytest tests for the curve arithmetic invariants, key generation, encryption/decryption correctness, homomorphic addition, one-hot vote encoding semantics and bounded discrete-log solving.
 
 \subsection{Engineering Observations}
 
-The dual test stack provides coverage at both the contract protocol layer and the cryptographic primitive layer, giving high confidence in isolated module correctness. However, integration testing revealed several boundary conditions worth noting for future development.
+The dual test stack gives coverage at the contract protocol level as well as the cryptographic primitive level, which gives high confidence in isolated module correctness. But, integration testing identified a few boundary cases that are notable to keep in mind during further development.
 
-First, the most brittle integration point is the mapping between circuit public signals and Solidity function parameters. Because snarkjs exports proof calldata in a specific encoding, any mismatch in signal ordering between the circuit definition and the contract's expected \texttt{pubSignals} array causes a generic rejection rather than a descriptive per-signal error. This was addressed by careful alignment during circuit compilation, but requires maintenance discipline whenever circuits are recompiled.
+To begin with, the most brittle integration point is the mapping from circuit public signals to Solidity function parameters because snarkjs exports proof calldata in some particular encoding, any discrepancy of signal ordering between the circuit definition and the contract's desired \texttt{pubSignals} array results in a generic reject, not a descriptive per-signal error. This was addressed by careful alignment during circuit compilation, but requires maintenance discipline whenever circuits are recompiled.
 
 Second, browser-side proof generation is resource-intensive. During development, memory pressure was observed on some low-memory devices and caused WASM instability. The voter interface should therefore include progress indicators and graceful error messages for proof generation failures.
 
@@ -165,16 +163,16 @@ For testnet or mainnet deployment, the following additional steps apply:
 \begin{itemize}
     \item For non-local deployment, either provide \texttt{ELGAMAL\_SK} in \texttt{.env} or provide the public key coordinates \texttt{ELGAMAL\_PK\_X} and \texttt{ELGAMAL\_PK\_Y}. The current deployment script intentionally has no insecure fallback administrator key.
     \item Configure \texttt{.env} with the deployer private key and the target network RPC URL before running the deploy script.
-    \item Ensure the \texttt{frontend/zk/} directory contains the compiled WASM witness generators and proving key files (\texttt{.zkey}) corresponding to the deployed verifier contracts. The same artifacts are required by both the browser flow and the Hardhat integration tests.
-    \item Configure MetaMask in the voter and administrator browsers to point to the correct network (chain ID must match the deployment target).
-    \item The trusted setup lineage (the \texttt{.ptau} used for key generation and circuit-specific \texttt{.zkey} files) must be kept consistent with the deployed verifier contracts. Recompiling circuits without redeploying verifiers will cause all proof submissions to fail.
+    \item In the \texttt{frontend/zk/} directory, the built WASM witness generators and the \texttt{.zkey} proving keys of the deployed verifier contracts must be present.
+    \item MetaMask should be set up on the voter's and administrator's browser with the proper network (the chain ID should match the deployment target).
+    \item The trusted setup lineage (the \texttt{.ptau} that was used in key generation and circuit-specific \texttt{.zkey} files) must match the deployed verifiers. Recompiling circuits without redeploying verifiers will cause all proof submissions to be rejected.
 \end{itemize}
 
-These operational dependencies are documented in the repository README, reflected in the package scripts, and enforced by the deployment script.
+The working dependencies are recorded in the repository's README, as well as in the deployment script.
 
 \section{Chapter Summary}
 
-This chapter translated the protocol design into concrete software modules and execution paths. The key result is implementation traceability: every major protocol claim in Chapter 3 is mapped to explicit contract logic, circuit constraints, frontend operations, and automated tests. Chapter 5 evaluates whether this implementation meets the stated requirements, reports performance characteristics, and identifies residual security gaps.
+This chapter turned the protocol design into actual code modules and execution traces. The main result is implementational traceability, i.e., all major protocol claims from Chapter~3 are linked with concrete contract logic, circuit constraints, frontend operation, and automated testing. Chapter~5 determines if it fulfills the above criteria, reports the performance attributes, and identifies remaining security vulnerabilities.
 
 \endgroup
 

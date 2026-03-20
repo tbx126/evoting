@@ -9,11 +9,11 @@
 
 \section{Protocol Roles}
 
-The protocol has three live roles: administrator, enrolled voter and public auditor. The primary protected values are vote privacy, result correctness and audit trace integrity.
+There are three roles in the protocol: administrator, voters and third-party auditor.
 
-\textbf{Administrator.} The administrator deploys the election contracts, manages the voter whitelist, and retains sole custody of the ElGamal private key $\mathit{sk}$. After voting concludes, the administrator performs homomorphic aggregation and submits the tally together with a Groth16 proof (ZKP3); the semi-trusted assumption governing this role is formalised in Section~3.2.
+\textbf{Administrator.} The administrator is the entity holding the election. It deploys smart contracts, manages the whitelist of voters' address and retains the ElGamal private key $\mathit{sk}$. When the election comes to the end, it is responsible for performing homomorphic aggregation and submitting the tally results together with a zero-knowledge proof (ZKP3).
 
-\textbf{Voter.} Any address on the administrator-managed whitelist may cast exactly one ballot by encrypting a one-hot candidate vector and generating a ZKP1/ZKP2 vote proof. Upon acceptance, the voter retains a local receipt for subsequent audit verification (Section~3.9).
+\textbf{Voter.} Any voter can use their address (on the whitelist) to cast a ballot by encrypting a one-hot vector and generating ZKP1 and ZKP2 proofs. Once the ballot is accepted, they can retain a local receipt for subsequent ballot inclusion verification. The encryption and generation are automatically calculated by scripts; all voters only need to do is choose their preferred candidate and sign the ballot with crypto wallet.
 
 \textbf{Public auditor.} Any party able to read blockchain data with no credentials: they can see on-chain state transitions, verify proofs of verification results and perform the auditing protocol from Section~3.9 with the public auditable package.
 
@@ -69,18 +69,18 @@ Table~\ref{tab:state-transition-guards} makes the transition guards explicit at 
 \small
 \caption{State Transition Guards and Rejection Rules}
 \label{tab:state-transition-guards}
-\begin{tabular}{L{2.8cm} L{2.2cm} L{5.8cm}}
+\begin{tabular}{L{3.5cm} L{4.5cm} L{5.5cm}}
 \toprule
-Transition & Actor & Guard and rejection behaviour \\
+Transition & Function & Guard condition \\
 \midrule
-\texttt{Created} $\rightarrow$ \texttt{Active} & Administrator & \texttt{startElection()} requires candidate count equals circuit cardinality; otherwise contract reverts. \\
-\texttt{Active} $\rightarrow$ \texttt{Ended} & Administrator & \texttt{endElection()} is accepted only in active state; otherwise contract reverts. \\
-\texttt{Ended} $\rightarrow$ \texttt{Tallied} & Administrator & \texttt{updateTallyResults()} requires valid ZKP3, matching public key signals, and total-vote consistency; otherwise contract reverts. \\
+\texttt{Created} $\rightarrow$ \texttt{Active} & \texttt{startElection()} & Candidate count equals circuit cardinality. \\
+\texttt{Active} $\rightarrow$ \texttt{Ended} & \texttt{endElection()} & Current state is \texttt{Active}. \\
+\texttt{Ended} $\rightarrow$ \texttt{Tallied} & \texttt{updateTallyResults()} & Valid ZKP3, matching public key signals, and total-vote consistency. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Figure~\ref{fig:protocol-flow} summarises the complete interaction sequence among administrator, voters, and smart contracts.
+Figure~\ref{fig:protocol-flow} illustrates the complete interaction procedure.
 
 \begin{figure}[htbp]
 \centering
@@ -144,7 +144,7 @@ For each candidate position $j$, ElGamal ciphertext is generated on BabyJubJub:
 \begin{equation}
 C1_j = r_j \cdot G, \quad C2_j = m_j \cdot G + r_j \cdot \mathit{PK}
 \end{equation}
-where $r_j$ is sampled uniformly from the BabyJubJub scalar field, $G$ is generator, and $\mathit{PK}$ is administrator public key. We write $C1_j=(\mathit{c1X}_j,\mathit{c1Y}_j)$ and $C2_j=(\mathit{c2X}_j,\mathit{c2Y}_j)$ for affine coordinates, which are used by the vote-proof witness and ciphertext binding hash. The notation is general in $N$, while the current deployed prototype instantiates $N=2$ and enforces this cardinality at contract layer.
+where $r_j$ is sampled uniformly from the BabyJubJub scalar field, $G$ is generator, and $\mathit{PK}$ is administrator public key. Here, $C1_j=(\mathit{c1X}_j,\mathit{c1Y}_j)$ and $C2_j=(\mathit{c2X}_j,\mathit{c2Y}_j)$ denote affine coordinates, which are used by the vote-proof witness and ciphertext binding hash. The notation is general in $N$, while the current deployed prototype instantiates $N=2$ and enforces this cardinality at contract layer.
 
 \section{Commitment and Ciphertext Binding}
 
